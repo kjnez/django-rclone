@@ -30,3 +30,4 @@ htmlcov/
 
 # rclone
 rclone.conf
+/django-dbbackup/
