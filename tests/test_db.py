@@ -170,6 +170,25 @@ class TestPgDumpGisConnector:
         assert "postgres" in cmd
 
     @patch("django_rclone.db.postgresql.subprocess.run")
+    def test_enable_postgis_without_optional_args(self, mock_run):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        c = PgDumpGisConnector(
+            {
+                "NAME": "geodb",
+                "HOST": "",
+                "PORT": "",
+                "USER": "",
+                "PASSWORD": "",
+                "ADMIN_USER": "",
+            }
+        )
+        c._enable_postgis()
+        cmd = mock_run.call_args[0][0]
+        assert "-U" not in cmd
+        assert "-h" not in cmd
+        assert "-p" not in cmd
+
+    @patch("django_rclone.db.postgresql.subprocess.run")
     @patch("django_rclone.db.postgresql.subprocess.Popen")
     def test_restore_skips_postgis_without_admin_user(self, mock_popen, mock_run):
         c = PgDumpGisConnector(

@@ -68,11 +68,12 @@ def _compile_db_filename_pattern(template: str) -> re.Pattern[str]:
 
         if field_name == "database":
             saw_database = True
-            parts.append(r"(?P<database>[^/]+?)")
-        elif field_name == "datetime":
-            parts.append(r"(?P<datetime>[^/]+?)")
-        elif field_name == "ext":
-            parts.append(r"(?P<ext>[^/]+)")
+        field_patterns = {
+            "database": r"(?P<database>[^/]+?)",
+            "datetime": r"(?P<datetime>[^/]+?)",
+            "ext": r"(?P<ext>[^/]+)",
+        }
+        parts.append(field_patterns[field_name])
 
     if not saw_database:  # pragma: no cover - guarded by the first_field check above
         raise CommandError(

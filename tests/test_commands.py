@@ -348,6 +348,45 @@ class TestDbestoreCommand:
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_with_explicit_database(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        call_command("dbrestore", database="default", input_path="backup.sqlite3", verbosity=0, interactive=False)
+        mock_get_connector.assert_called_once_with("default")
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_interactive_confirm_yes(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        with patch("builtins.input", return_value="y"):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0)
+        connector.restore.assert_called_once()
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
     def test_rejects_parent_path_segments(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
         mock_get_connector.return_value = MagicMock()
         mock_rclone_cls.return_value = MagicMock()
