@@ -1,7 +1,7 @@
 # django-rclone
 
 [![CI](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml/badge.svg)](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml)
-[![TestPyPI](https://img.shields.io/pypi/v/django-rclone?pypiBaseUrl=https://test.pypi.org&label=TestPyPI)](https://test.pypi.org/project/django-rclone/)
+[![PyPI](https://img.shields.io/pypi/v/django-rclone)](https://pypi.org/project/django-rclone/)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/kjnez/django-rclone)
 
 Django database and media backup management commands, powered by [rclone](https://rclone.org/).
