@@ -8,7 +8,17 @@ from django.core.management.base import CommandError
 from django.test import override_settings
 
 from django_rclone.exceptions import RcloneError
-from django_rclone.signals import post_db_backup, post_db_restore, pre_db_backup, pre_db_restore
+from django_rclone.management.commands.listbackups import Command as ListbackupsCommand
+from django_rclone.signals import (
+    post_db_backup,
+    post_db_restore,
+    post_media_backup,
+    post_media_restore,
+    pre_db_backup,
+    pre_db_restore,
+    pre_media_backup,
+    pre_media_restore,
+)
 
 
 class TestDbbackupCommand:
@@ -140,6 +150,108 @@ class TestDbbackupCommand:
         rclone.delete.assert_called_once_with(staged_path)
         rclone.moveto.assert_not_called()
 
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_moveto_failure_deletes_staged_backup(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        dump_proc = MagicMock()
+        dump_proc.stdout = MagicMock()
+        dump_proc.returncode = 0
+        connector.dump.return_value = dump_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        rclone.moveto.side_effect = RcloneError(["rclone", "moveto"], 1, "moveto failed")
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbbackup", verbosity=0)
+
+        rclone.delete.assert_called_once()
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_verbose_output(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        dump_proc = MagicMock()
+        dump_proc.stdout = MagicMock()
+        dump_proc.returncode = 0
+        connector.dump.return_value = dump_proc
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("dbbackup", verbosity=1, stdout=out)
+        output = out.getvalue()
+        assert "Backing up database" in output
+        assert "Backup completed" in output
+
+    @patch("django_rclone.management.commands.dbbackup.validate_db_filename_template")
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    @override_settings(
+        DJANGO_RCLONE={"REMOTE": "testremote:backups", "DB_FILENAME_TEMPLATE": "{database}-{datetime}-{missing}.{ext}"}
+    )
+    def test_template_key_error(
+        self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock, mock_validate: MagicMock
+    ):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        with pytest.raises(CommandError, match="unknown placeholder"):
+            call_command("dbbackup", verbosity=0)
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    @patch("django_rclone.management.commands.dbbackup.validate_db_filename_template")
+    @override_settings(
+        DJANGO_RCLONE={
+            "REMOTE": "testremote:backups",
+            "DB_FILENAME_TEMPLATE": "{database}/{datetime}.{ext}",
+        }
+    )
+    def test_filename_with_slash(
+        self, mock_validate: MagicMock, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock
+    ):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        with pytest.raises(CommandError, match="must render a filename, not a path"):
+            call_command("dbbackup", verbosity=0)
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_cleanup_verbose_output(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        dump_proc = MagicMock()
+        dump_proc.stdout = MagicMock()
+        dump_proc.returncode = 0
+        connector.dump.return_value = dump_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        rclone.lsjson.return_value = [
+            {"Name": f"default-2024-01-{i:02d}-120000.sqlite3", "ModTime": f"2024-01-{i:02d}T12:00:00Z", "Size": 100}
+            for i in range(1, 13)
+        ]
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("dbbackup", clean=True, verbosity=1, stdout=out)
+        output = out.getvalue()
+        assert "Removing old backup" in output
+
 
 class TestDbestoreCommand:
     @patch("django_rclone.management.commands.dbrestore.Rclone")
@@ -252,6 +364,112 @@ class TestDbestoreCommand:
         with pytest.raises(CommandError):
             call_command("dbrestore", interactive=False, verbosity=0)
 
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_verbose_output(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("dbrestore", input_path="backup.sqlite3", verbosity=1, interactive=False, stdout=out)
+        output = out.getvalue()
+        assert "Restoring database" in output
+        assert "Restore completed" in output
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_cat_process_failure(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 1
+        cat_proc.stderr.read.return_value = b"cat failed"
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_process_failure(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 1
+        restore_proc.stderr.read.return_value = b"restore failed"
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_find_latest_no_backups(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_get_connector.return_value = MagicMock()
+        rclone = MagicMock()
+        rclone.lsjson.return_value = []
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbrestore", verbosity=0, interactive=False)
+
+    def test_validate_input_path_empty(self):
+        from django_rclone.management.commands.dbrestore import Command
+
+        cmd = Command()
+        with pytest.raises(CommandError, match="cannot be empty"):
+            cmd._validate_input_path("")
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_rejects_backslash_in_input_path(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_get_connector.return_value = MagicMock()
+        mock_rclone_cls.return_value = MagicMock()
+        with pytest.raises(CommandError, match="relative POSIX-style path"):
+            call_command("dbrestore", input_path="sub\\backup.sqlite3", interactive=False, verbosity=0)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_rejects_absolute_input_path(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_get_connector.return_value = MagicMock()
+        mock_rclone_cls.return_value = MagicMock()
+        with pytest.raises(CommandError, match="relative POSIX-style path"):
+            call_command("dbrestore", input_path="/absolute/backup.sqlite3", interactive=False, verbosity=0)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_rejects_dot_segment_in_input_path(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_get_connector.return_value = MagicMock()
+        mock_rclone_cls.return_value = MagicMock()
+        with pytest.raises(CommandError, match="cannot contain '\\.' or '\\.\\.'"):
+            call_command("dbrestore", input_path="./backup.sqlite3", interactive=False, verbosity=0)
+
 
 class TestMediabackupCommand:
     @patch("django_rclone.management.commands.mediabackup.Rclone")
@@ -266,10 +484,46 @@ class TestMediabackupCommand:
     @patch("django_rclone.management.commands.mediabackup.Rclone")
     @override_settings(MEDIA_ROOT="")
     def test_no_media_root(self, mock_rclone_cls: MagicMock):
-        import pytest
-
         with pytest.raises(SystemExit):
             call_command("mediabackup", verbosity=0)
+
+    @patch("django_rclone.management.commands.mediabackup.Rclone")
+    def test_verbose_output(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone._remote_path.return_value = "testremote:backups/media"
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("mediabackup", verbosity=1, stdout=out)
+        output = out.getvalue()
+        assert "Syncing media from" in output
+        assert "Media backup completed" in output
+
+    @patch("django_rclone.management.commands.mediabackup.Rclone")
+    def test_sends_signals(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone._remote_path.return_value = "testremote:backups/media"
+        mock_rclone_cls.return_value = rclone
+
+        signals_received: list[str] = []
+
+        def pre_handler(sender, **kwargs):
+            signals_received.append("pre")
+
+        def post_handler(sender, **kwargs):
+            signals_received.append("post")
+
+        pre_media_backup.connect(pre_handler, dispatch_uid="test_pre_media_backup")
+        post_media_backup.connect(post_handler, dispatch_uid="test_post_media_backup")
+
+        try:
+            call_command("mediabackup", verbosity=0)
+            assert signals_received == ["pre", "post"]
+        finally:
+            pre_media_backup.disconnect(dispatch_uid="test_pre_media_backup")
+            post_media_backup.disconnect(dispatch_uid="test_post_media_backup")
 
 
 class TestMediarestoreCommand:
@@ -281,6 +535,50 @@ class TestMediarestoreCommand:
 
         call_command("mediarestore", verbosity=0)
         rclone.sync.assert_called_once_with("testremote:backups/media", "/tmp/django_rclone_test_media")
+
+    @patch("django_rclone.management.commands.mediarestore.Rclone")
+    @override_settings(MEDIA_ROOT="")
+    def test_no_media_root(self, mock_rclone_cls: MagicMock):
+        with pytest.raises(SystemExit):
+            call_command("mediarestore", verbosity=0)
+
+    @patch("django_rclone.management.commands.mediarestore.Rclone")
+    def test_verbose_output(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone._remote_path.return_value = "testremote:backups/media"
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("mediarestore", verbosity=1, stdout=out)
+        output = out.getvalue()
+        assert "Syncing media from" in output
+        assert "Media restore completed" in output
+
+    @patch("django_rclone.management.commands.mediarestore.Rclone")
+    def test_sends_signals(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone._remote_path.return_value = "testremote:backups/media"
+        mock_rclone_cls.return_value = rclone
+
+        signals_received: list[str] = []
+
+        def pre_handler(sender, **kwargs):
+            signals_received.append("pre")
+
+        def post_handler(sender, **kwargs):
+            signals_received.append("post")
+
+        pre_media_restore.connect(pre_handler, dispatch_uid="test_pre_media_restore")
+        post_media_restore.connect(post_handler, dispatch_uid="test_post_media_restore")
+
+        try:
+            call_command("mediarestore", verbosity=0)
+            assert signals_received == ["pre", "post"]
+        finally:
+            pre_media_restore.disconnect(dispatch_uid="test_pre_media_restore")
+            post_media_restore.disconnect(dispatch_uid="test_post_media_restore")
 
 
 class TestListbackupsCommand:
@@ -334,3 +632,47 @@ class TestListbackupsCommand:
         mock_rclone_cls.return_value = MagicMock()
         with pytest.raises(CommandError):
             call_command("listbackups", database="default")
+
+    @patch("django_rclone.management.commands.listbackups.Rclone")
+    def test_no_db_backups(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone.lsjson.return_value = []
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("listbackups", stdout=out)
+        assert "No database backups found" in out.getvalue()
+
+    @patch("django_rclone.management.commands.listbackups.Rclone")
+    def test_no_media_backups(self, mock_rclone_cls: MagicMock):
+        rclone = MagicMock()
+        rclone.lsjson.return_value = []
+        mock_rclone_cls.return_value = rclone
+
+        from io import StringIO
+
+        out = StringIO()
+        call_command("listbackups", media=True, stdout=out)
+        assert "No media backups found" in out.getvalue()
+
+
+class TestFormatSize:
+    def test_bytes(self):
+        assert ListbackupsCommand._format_size(512) == "512 B"
+
+    def test_kilobytes(self):
+        assert ListbackupsCommand._format_size(1024) == "1.0 KB"
+
+    def test_megabytes(self):
+        assert ListbackupsCommand._format_size(1024**2) == "1.0 MB"
+
+    def test_gigabytes(self):
+        assert ListbackupsCommand._format_size(1024**3) == "1.0 GB"
+
+    def test_terabytes(self):
+        assert ListbackupsCommand._format_size(1024**4) == "1.0 TB"
+
+    def test_petabytes(self):
+        assert ListbackupsCommand._format_size(1024**5) == "1.0 PB"

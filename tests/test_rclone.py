@@ -145,6 +145,23 @@ class TestLsjson:
         cmd = mock_run.call_args[0][0]
         assert "--recursive" in cmd
 
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_false_and_none_flags_excluded(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"[]", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.lsjson("db/", recursive=False, max_depth=None)
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["rclone", "lsjson", "r:b/db/"]
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_value_flag(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"[]", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.lsjson("db/", max_depth=2)
+        cmd = mock_run.call_args[0][0]
+        assert "--max-depth" in cmd
+        assert "2" in cmd
+
 
 class TestSync:
     @patch("django_rclone.rclone.subprocess.run")
@@ -164,6 +181,57 @@ class TestSync:
         assert "--verbose" in cmd
         assert "--transfers" in cmd
         assert "4" in cmd
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_false_and_none_flags_excluded(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.sync("/tmp/src", "r:b/dst", verbose=False, checksum=None)
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["rclone", "sync", "/tmp/src", "r:b/dst"]
+
+
+class TestCopy:
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_basic_copy(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.copy("/tmp/src", "r:b/dst")
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["rclone", "copy", "/tmp/src", "r:b/dst"]
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_with_boolean_true_flag(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.copy("/tmp/src", "r:b/dst", verbose=True)
+        cmd = mock_run.call_args[0][0]
+        assert "--verbose" in cmd
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_with_value_flag(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.copy("/tmp/src", "r:b/dst", transfers=4)
+        cmd = mock_run.call_args[0][0]
+        assert "--transfers" in cmd
+        assert "4" in cmd
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_false_and_none_flags_excluded(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.copy("/tmp/src", "r:b/dst", verbose=False, checksum=None)
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["rclone", "copy", "/tmp/src", "r:b/dst"]
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_underscore_to_hyphen(self, mock_run: MagicMock):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        rc = Rclone(remote="r:b", binary="rclone")
+        rc.copy("/tmp/src", "r:b/dst", no_traverse=True)
+        cmd = mock_run.call_args[0][0]
+        assert "--no-traverse" in cmd
 
 
 class TestDelete:

@@ -16,10 +16,10 @@ classifiers = [
 dependencies = ["django>=4.2"]
 
 [project.urls]
-Repository = "https://github.com/j/django-rclone"
+Repository = "https://github.com/kjnez/django-rclone"
 
 [dependency-groups]
-dev = ["pre-commit", "ruff", "ty", "pytest", "pytest-django"]
+dev = ["pre-commit", "ruff", "ty", "pytest", "pytest-django", "coverage[toml]", "pytest-cov"]
 
 [build-system]
 requires = ["hatchling"]
@@ -43,6 +43,13 @@ quote-style = "double"
 DJANGO_SETTINGS_MODULE = "tests.settings"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["django_rclone"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
 
 [tool.ty.environment]
 python-version = "3.13"

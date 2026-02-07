@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import subprocess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.test import override_settings
@@ -53,6 +53,23 @@ class TestSqliteConnector:
         c = SqliteConnector({"NAME": "/tmp/test.db"})
         assert c.extension == "sqlite3"
 
+    @patch("django_rclone.db.sqlite.subprocess.Popen")
+    def test_dump(self, mock_popen):
+        c = SqliteConnector({"NAME": "/tmp/test.db"})
+        c.dump()
+        cmd = mock_popen.call_args[0][0]
+        assert cmd == ["sqlite3", "/tmp/test.db", ".dump"]
+        assert mock_popen.call_args[1]["stdout"] == subprocess.PIPE
+
+    @patch("django_rclone.db.sqlite.subprocess.Popen")
+    def test_restore(self, mock_popen):
+        c = SqliteConnector({"NAME": "/tmp/test.db"})
+        stdin_mock = MagicMock()
+        c.restore(stdin=stdin_mock)
+        cmd = mock_popen.call_args[0][0]
+        assert cmd == ["sqlite3", "/tmp/test.db"]
+        assert mock_popen.call_args[1]["stdin"] is stdin_mock
+
 
 class TestPgDumpConnector:
     def test_extension(self):
@@ -85,6 +102,41 @@ class TestPgDumpConnector:
     def test_common_args_empty(self):
         c = PgDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
         assert c._common_args() == []
+
+    @patch("django_rclone.db.postgresql.subprocess.Popen")
+    def test_dump(self, mock_popen):
+        settings = {
+            "NAME": "mydb",
+            "HOST": "localhost",
+            "PORT": "5432",
+            "USER": "admin",
+            "PASSWORD": "secret",
+        }
+        c = PgDumpConnector(settings)
+        c.dump()
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "pg_dump"
+        assert "--format=custom" in cmd
+        assert "mydb" in cmd
+        assert mock_popen.call_args[1]["env"]["PGPASSWORD"] == "secret"
+
+    @patch("django_rclone.db.postgresql.subprocess.Popen")
+    def test_restore(self, mock_popen):
+        settings = {
+            "NAME": "mydb",
+            "HOST": "localhost",
+            "PORT": "5432",
+            "USER": "admin",
+            "PASSWORD": "secret",
+        }
+        c = PgDumpConnector(settings)
+        stdin_mock = MagicMock()
+        c.restore(stdin=stdin_mock)
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "pg_restore"
+        assert "--no-owner" in cmd
+        assert "-d" in cmd
+        assert mock_popen.call_args[1]["stdin"] is stdin_mock
 
 
 class TestPgDumpGisConnector:
@@ -188,6 +240,40 @@ class TestMysqlDumpConnector:
         c = MysqlDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
         assert c._common_args() == []
 
+    @patch("django_rclone.db.mysql.subprocess.Popen")
+    def test_dump(self, mock_popen):
+        settings = {
+            "NAME": "mydb",
+            "HOST": "localhost",
+            "PORT": "3306",
+            "USER": "admin",
+            "PASSWORD": "secret",
+        }
+        c = MysqlDumpConnector(settings)
+        c.dump()
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "mysqldump"
+        assert "--quick" in cmd
+        assert "mydb" in cmd
+        assert mock_popen.call_args[1]["env"]["MYSQL_PWD"] == "secret"
+
+    @patch("django_rclone.db.mysql.subprocess.Popen")
+    def test_restore(self, mock_popen):
+        settings = {
+            "NAME": "mydb",
+            "HOST": "localhost",
+            "PORT": "3306",
+            "USER": "admin",
+            "PASSWORD": "secret",
+        }
+        c = MysqlDumpConnector(settings)
+        stdin_mock = MagicMock()
+        c.restore(stdin=stdin_mock)
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "mysql"
+        assert "mydb" in cmd
+        assert mock_popen.call_args[1]["stdin"] is stdin_mock
+
 
 class TestMongoDumpConnector:
     def test_extension(self):
@@ -219,6 +305,37 @@ class TestMongoDumpConnector:
     def test_auth_args_no_credentials(self):
         c = MongoDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
         assert c._auth_args() == []
+
+    @patch("django_rclone.db.mongodb.subprocess.Popen")
+    def test_dump(self, mock_popen):
+        settings = {
+            "NAME": "mydb",
+            "HOST": "mongo.example.com",
+            "PORT": "27018",
+            "USER": "",
+            "PASSWORD": "",
+        }
+        c = MongoDumpConnector(settings)
+        c.dump()
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "mongodump"
+        assert "--db" in cmd
+        assert "mydb" in cmd
+        assert "--archive" in cmd
+        assert "--host" in cmd
+        assert "mongo.example.com:27018" in cmd
+        assert mock_popen.call_args[1]["stdout"] == subprocess.PIPE
+
+    @patch("django_rclone.db.mongodb.subprocess.Popen")
+    def test_restore(self, mock_popen):
+        c = MongoDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
+        stdin_mock = MagicMock()
+        c.restore(stdin=stdin_mock)
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "mongorestore"
+        assert "--drop" in cmd
+        assert "--archive" in cmd
+        assert mock_popen.call_args[1]["stdin"] is stdin_mock
 
 
 class TestRegistry:

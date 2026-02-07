@@ -114,6 +114,6 @@ class Command(BaseCommand):
         parts = [part for part in input_path.split("/") if part]
         if any(part in {".", ".."} for part in parts):
             raise CommandError("--input-path cannot contain '.' or '..' path segments.")
-        if not parts:
+        if not parts:  # pragma: no cover - guarded by the empty check above
             raise CommandError("--input-path must point to a file under DB_BACKUP_DIR.")
         return "/".join(parts)

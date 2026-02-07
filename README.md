@@ -1,5 +1,9 @@
 # django-rclone
 
+[![CI](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml/badge.svg)](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml)
+[![TestPyPI](https://img.shields.io/pypi/v/django-rclone?pypiBaseUrl=https://test.pypi.org&label=TestPyPI)](https://test.pypi.org/project/django-rclone/)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/kjnez/django-rclone)
+
 Django database and media backup management commands, powered by [rclone](https://rclone.org/).
 
 django-rclone bridges Django's database layer with rclone's file transfer layer. You get native database dumps piped directly to any of rclone's 70+ supported cloud storage backends -- no temp files, no intermediate archives, no Python reimplementations of what rclone already does.
@@ -195,6 +199,18 @@ Management Commands (dbbackup, dbrestore, mediabackup, mediarestore, listbackups
 Database dumps stream directly from the dump process into `rclone rcat` via Unix pipes. No intermediate files are written. Restores work in reverse: `rclone cat` streams into the database restore process.
 
 Media backups use `rclone sync`, which is incremental by default -- only changed files are transferred.
+
+## Development
+
+Contributions are welcome. This project enforces **100% test coverage** -- all new code must be fully covered by tests. The CI pipeline will fail if coverage drops below 100%.
+
+```bash
+uv sync                                  # Install dependencies
+uv run pytest --cov --cov-report=term    # Run tests with coverage
+uv run ruff check .                      # Lint
+uv run ruff format --check .             # Check formatting
+uv run ty check                          # Type check
+```
 
 ## License
 

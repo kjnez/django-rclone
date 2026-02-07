@@ -74,7 +74,7 @@ def _compile_db_filename_pattern(template: str) -> re.Pattern[str]:
         elif field_name == "ext":
             parts.append(r"(?P<ext>[^/]+)")
 
-    if not saw_database:
+    if not saw_database:  # pragma: no cover - guarded by the first_field check above
         raise CommandError(
             "DB_FILENAME_TEMPLATE must include {database} so backups can be associated "
             "with the correct Django database alias."
