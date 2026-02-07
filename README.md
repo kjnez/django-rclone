@@ -206,7 +206,7 @@ Contributions are welcome. This project enforces **100% test coverage** -- all n
 
 ```bash
 uv sync                                  # Install dependencies
-uv run pytest --cov --cov-report=term    # Run tests with coverage
+uv run pytest --cov --cov-branch          # Run tests with coverage
 uv run ruff check .                      # Lint
 uv run ruff format --check .             # Check formatting
 uv run ty check                          # Type check
