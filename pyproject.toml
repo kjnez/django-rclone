@@ -3,17 +3,21 @@ name = "django-rclone"
 version = "0.1.0"
 description = "rclone wrapper for Django database and media file backups"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = "MIT"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
-dependencies = ["django>=4.2"]
+dependencies = ["django>=5.2"]
 
 [project.urls]
 Documentation = "https://django-rclone.readthedocs.io/"
@@ -41,7 +45,7 @@ packages = ["src/django_rclone"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py312"
 exclude = ["django-dbbackup"]
 
 [tool.ruff.lint]
@@ -63,7 +67,7 @@ show_missing = true
 fail_under = 100
 
 [tool.ty.environment]
-python-version = "3.13"
+python-version = "3.12"
 
 [tool.ty.src]
 exclude = ["django-dbbackup"]

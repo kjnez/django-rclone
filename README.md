@@ -4,6 +4,8 @@
 [![PyPI](https://img.shields.io/pypi/v/django-rclone)](https://pypi.org/project/django-rclone/)
 [![Documentation](https://readthedocs.org/projects/django-rclone/badge/?version=latest)](https://django-rclone.readthedocs.io/)
 [![codecov](https://codecov.io/gh/kjnez/django-rclone/graph/badge.svg)](https://codecov.io/gh/kjnez/django-rclone)
+[![Python versions](https://img.shields.io/pypi/pyversions/django-rclone)](https://pypi.org/project/django-rclone/)
+[![Django versions](https://img.shields.io/badge/django-5.2%20%7C%206.0-blue)](https://www.djangoproject.com/)
 
 Django database and media backup management commands, powered by [rclone](https://rclone.org/).
 
@@ -31,8 +33,8 @@ The result is significantly less code doing significantly less work. Storage abs
 
 ## Requirements
 
-- Python 3.13+
-- Django 4.2+
+- Python 3.12+
+- Django 5.2+
 - [rclone](https://rclone.org/install/) installed and configured
 
 ## Installation
