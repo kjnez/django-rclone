@@ -16,10 +16,21 @@ classifiers = [
 dependencies = ["django>=4.2"]
 
 [project.urls]
+Documentation = "https://django-rclone.readthedocs.io/"
 Repository = "https://github.com/kjnez/django-rclone"
 
 [dependency-groups]
-dev = ["pre-commit", "ruff", "ty", "pytest", "pytest-django", "coverage[toml]", "pytest-cov"]
+dev = [
+    "pre-commit",
+    "ruff",
+    "ty",
+    "pytest",
+    "pytest-django",
+    "coverage[toml]",
+    "pytest-cov",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.1",
+]
 
 [build-system]
 requires = ["hatchling"]

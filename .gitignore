@@ -20,6 +20,9 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# MkDocs build output
+site/
+
 # Coverage / test
 .coverage
 htmlcov/

@@ -1,0 +1,43 @@
+site_name: django-rclone
+site_url: https://django-rclone.readthedocs.io/
+site_description: Django database and media backup management commands, powered by rclone.
+repo_url: https://github.com/kjnez/django-rclone
+repo_name: kjnez/django-rclone
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.instant
+    - navigation.sections
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Commands: commands.md
+  - Configuration: configuration.md
+  - Connectors: connectors.md
+  - Signals: signals.md
+  - Migrating from django-dbbackup: migration-from-dbbackup.md
