@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django_rclone.db.registry import get_connector
 from django_rclone.exceptions import RcloneError
 from django_rclone.filenames import database_from_backup_name, validate_db_filename_template
-from django_rclone.process_utils import join_pipe_drain, start_pipe_drain
+from django_rclone.process_utils import begin_stderr_drain, finish_process
 from django_rclone.rclone import Rclone
 from django_rclone.settings import get_setting
 from django_rclone.signals import post_db_backup, pre_db_backup
@@ -67,19 +67,14 @@ class Command(BaseCommand):
         # Dump database and stream to a temporary remote object first.
         dump_proc = connector.dump()
         assert dump_proc.stdout is not None
-        dump_stderr_drain = start_pipe_drain(dump_proc.stderr)
+        dump_stderr_drain = begin_stderr_drain(dump_proc)
         upload_error: RcloneError | None = None
         try:
             rclone.rcat(temp_remote_path, stdin=dump_proc.stdout)
         except RcloneError as exc:
             upload_error = exc
         finally:
-            dump_proc.stdout.close()
-            dump_proc.stdout = None  # prevent communicate() from reading closed fd
-            if dump_stderr_drain is not None:
-                dump_proc.stderr = None  # drained by background reader
-            _, dump_stderr_pipe = dump_proc.communicate()
-            dump_stderr = join_pipe_drain(dump_stderr_drain) or dump_stderr_pipe or b""
+            _, dump_stderr = finish_process(dump_proc, stderr_drain=dump_stderr_drain, close_stdout=True)
 
         if dump_proc.returncode != 0:
             stderr = dump_stderr.decode(errors="replace") if dump_stderr else ""

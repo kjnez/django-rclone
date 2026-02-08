@@ -279,30 +279,31 @@ class TestDbbackupCommand:
 
     @patch("django_rclone.management.commands.dbbackup.Rclone")
     @patch("django_rclone.management.commands.dbbackup.get_connector")
-    def test_dump_marks_stderr_drained_when_background_drain_used(
-        self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock
-    ):
+    def test_dump_uses_centralized_process_finalizer(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
         connector = MagicMock()
         connector.extension = "sqlite3"
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
-        dump_proc.stderr = MagicMock()
         dump_proc.returncode = 0
         dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
         mock_rclone_cls.return_value = MagicMock()
+        drain = (MagicMock(), [b"stderr data"])
 
         with (
             patch(
-                "django_rclone.management.commands.dbbackup.start_pipe_drain",
-                return_value=(MagicMock(), [b"stderr data"]),
+                "django_rclone.management.commands.dbbackup.begin_stderr_drain",
+                return_value=drain,
             ),
-            patch("django_rclone.management.commands.dbbackup.join_pipe_drain", return_value=b"stderr data"),
+            patch(
+                "django_rclone.management.commands.dbbackup.finish_process",
+                return_value=(b"", b"stderr data"),
+            ) as mock_finish,
         ):
             call_command("dbbackup", verbosity=0)
 
-        assert dump_proc.stderr is None
+        mock_finish.assert_called_once_with(dump_proc, stderr_drain=drain, close_stdout=True)
 
 
 class TestDbestoreCommand:
@@ -604,7 +605,7 @@ class TestDbestoreCommand:
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
-    def test_restore_marks_cat_stderr_drained_when_background_drain_used(
+    def test_restore_uses_centralized_process_finalizer(
         self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock
     ):
         connector = MagicMock()
@@ -622,17 +623,25 @@ class TestDbestoreCommand:
         cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
+        drain = (MagicMock(), [b"stderr data"])
 
         with (
             patch(
-                "django_rclone.management.commands.dbrestore.start_pipe_drain",
-                return_value=(MagicMock(), [b"stderr data"]),
+                "django_rclone.management.commands.dbrestore.begin_stderr_drain",
+                return_value=drain,
             ),
-            patch("django_rclone.management.commands.dbrestore.join_pipe_drain", return_value=b"stderr data"),
+            patch("django_rclone.management.commands.dbrestore.close_process_stdout") as mock_close_stdout,
+            patch(
+                "django_rclone.management.commands.dbrestore.finish_process",
+                side_effect=[(b"", b""), (b"", b"stderr data")],
+            ) as mock_finish,
         ):
             call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
 
-        assert cat_proc.stderr is None
+        mock_close_stdout.assert_called_once_with(cat_proc)
+        assert mock_finish.call_count == 2
+        mock_finish.assert_any_call(restore_proc)
+        mock_finish.assert_any_call(cat_proc, stderr_drain=drain)
 
 
 class TestMediabackupCommand:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import subprocess
 from contextlib import suppress
 from threading import Thread
 from typing import IO
@@ -41,3 +42,35 @@ def join_pipe_drain(drain: PipeDrain) -> bytes:
     thread, chunks = drain
     thread.join()
     return b"".join(chunks)
+
+
+def begin_stderr_drain(proc: subprocess.Popen[bytes]) -> PipeDrain:
+    """Start draining ``proc.stderr`` and detach it from communicate() if possible."""
+    drain = start_pipe_drain(proc.stderr)
+    if drain is not None:
+        proc.stderr = None
+    return drain
+
+
+def close_process_stdout(proc: subprocess.Popen[bytes]) -> None:
+    """Close and detach ``proc.stdout`` to signal downstream consumers."""
+    if proc.stdout is None:
+        return
+    with suppress(OSError, ValueError):
+        proc.stdout.close()
+    proc.stdout = None
+
+
+def finish_process(
+    proc: subprocess.Popen[bytes],
+    *,
+    stderr_drain: PipeDrain = None,
+    close_stdout: bool = False,
+    timeout: float | None = None,
+) -> tuple[bytes, bytes]:
+    """Wait for process completion and return ``(stdout, stderr)`` bytes safely."""
+    if close_stdout:
+        close_process_stdout(proc)
+    stdout, stderr_pipe = proc.communicate(timeout=timeout)
+    stderr = join_pipe_drain(stderr_drain) or stderr_pipe or b""
+    return stdout or b"", stderr
