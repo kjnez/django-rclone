@@ -10,11 +10,11 @@ Use `context7` to check documentation of packages.
 ## Development
 
 ```bash
-uv sync                      # Install dependencies
-uv run ruff check .          # Lint
-uv run ruff format --check . # Check formatting
-uv run ty check              # Type check
-uv run pytest                # Run tests
+uv sync                              # Install dependencies
+uv run ruff check .                  # Lint
+uv run ruff format --check .         # Check formatting
+uv run ty check                      # Type check
+uv run pytest --cov --cov-branch     # Run tests
 ```
 
 ## CI

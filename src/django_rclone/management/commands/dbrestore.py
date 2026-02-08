@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from django_rclone.db.registry import get_connector
 from django_rclone.filenames import database_from_backup_name, validate_db_filename_template
+from django_rclone.process_utils import join_pipe_drain, start_pipe_drain
 from django_rclone.rclone import Rclone
 from django_rclone.settings import get_setting
 from django_rclone.signals import post_db_restore, pre_db_restore
@@ -74,17 +75,25 @@ class Command(BaseCommand):
         cat_proc = rclone.cat(remote_path)
         assert cat_proc.stdout is not None
         restore_proc = connector.restore(stdin=cat_proc.stdout)
+        cat_stderr_drain = start_pipe_drain(cat_proc.stderr)
         cat_proc.stdout.close()
-        restore_proc.wait()
-        cat_proc.wait()
+        cat_proc.stdout = None  # prevent communicate() from reading closed fd
+
+        if cat_stderr_drain is not None:
+            cat_proc.stderr = None  # drained by background reader
+
+        # Drain restore output while rclone streams dump data into restore stdin.
+        _, restore_stderr = restore_proc.communicate()
+        _, cat_stderr_pipe = cat_proc.communicate()
+        cat_stderr = join_pipe_drain(cat_stderr_drain) or cat_stderr_pipe or b""
 
         if cat_proc.returncode != 0:
-            stderr = cat_proc.stderr.read().decode(errors="replace") if cat_proc.stderr else ""
+            stderr = cat_stderr.decode(errors="replace") if cat_stderr else ""
             self.stderr.write(f"rclone cat failed: {stderr}")
             raise SystemExit(1)
 
         if restore_proc.returncode != 0:
-            stderr = restore_proc.stderr.read().decode(errors="replace") if restore_proc.stderr else ""
+            stderr = restore_stderr.decode(errors="replace") if restore_stderr else ""
             self.stderr.write(f"Database restore failed: {stderr}")
             raise SystemExit(1)
 

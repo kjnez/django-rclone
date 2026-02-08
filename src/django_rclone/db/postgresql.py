@@ -34,7 +34,7 @@ class PgDumpConnector(BaseConnector):
 
     def dump(self) -> subprocess.Popen[bytes]:
         """Dump PostgreSQL database using pg_dump in custom format."""
-        cmd = ["pg_dump", "--format=custom", *self._common_args(), self.name]
+        cmd = ["pg_dump", "--format=custom", "--no-password", *self._common_args(), self.name]
         return subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -44,7 +44,17 @@ class PgDumpConnector(BaseConnector):
 
     def restore(self, stdin: Any) -> subprocess.Popen[bytes]:
         """Restore PostgreSQL database using pg_restore."""
-        cmd = ["pg_restore", "--no-owner", "--no-acl", "-d", self.name, *self._common_args()]
+        cmd = [
+            "pg_restore",
+            "--no-owner",
+            "--no-acl",
+            "--clean",
+            "--if-exists",
+            "--no-password",
+            "-d",
+            self.name,
+            *self._common_args(),
+        ]
         return subprocess.Popen(
             cmd,
             stdin=stdin,

@@ -11,8 +11,8 @@ django-rclone uses a strategy pattern for database connectors. Each connector wr
 
 Uses `pg_dump` with custom (binary) format for backups and `pg_restore` for restores.
 
-- **Dump:** `pg_dump --format=custom [-h HOST] [-p PORT] [-U USER] DBNAME`
-- **Restore:** `pg_restore --no-owner --no-acl -d DBNAME [-h HOST] [-p PORT] [-U USER]`
+- **Dump:** `pg_dump --format=custom --no-password [-h HOST] [-p PORT] [-U USER] DBNAME`
+- **Restore:** `pg_restore --no-owner --no-acl --clean --if-exists --no-password -d DBNAME [-h HOST] [-p PORT] [-U USER]`
 - **Extension:** `.dump`
 
 **Security:** Passwords are passed via the `PGPASSWORD` environment variable, never as command-line arguments. This means the password is not visible in process listings (`ps aux`), unlike django-dbbackup which passes credentials via CLI args.

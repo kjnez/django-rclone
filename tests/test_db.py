@@ -117,6 +117,7 @@ class TestPgDumpConnector:
         cmd = mock_popen.call_args[0][0]
         assert cmd[0] == "pg_dump"
         assert "--format=custom" in cmd
+        assert "--no-password" in cmd
         assert "mydb" in cmd
         assert mock_popen.call_args[1]["env"]["PGPASSWORD"] == "secret"
 
@@ -135,6 +136,9 @@ class TestPgDumpConnector:
         cmd = mock_popen.call_args[0][0]
         assert cmd[0] == "pg_restore"
         assert "--no-owner" in cmd
+        assert "--clean" in cmd
+        assert "--if-exists" in cmd
+        assert "--no-password" in cmd
         assert "-d" in cmd
         assert mock_popen.call_args[1]["stdin"] is stdin_mock
 
@@ -358,6 +362,10 @@ class TestMongoDumpConnector:
 
 
 class TestRegistry:
+    pytestmark = pytest.mark.filterwarnings(
+        "ignore:Overriding setting DATABASES can lead to unexpected behavior\\.:UserWarning"
+    )
+
     def test_get_sqlite_connector(self):
         connector = get_connector("default")
         assert isinstance(connector, SqliteConnector)

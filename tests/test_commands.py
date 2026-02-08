@@ -31,7 +31,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
-        dump_proc.wait.return_value = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -62,6 +62,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
         mock_rclone_cls.return_value = MagicMock()
@@ -92,6 +93,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -114,7 +116,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 1
-        dump_proc.stderr.read.return_value = b"dump failed"
+        dump_proc.communicate.return_value = (None, b"dump failed")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -136,6 +138,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -158,6 +161,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -178,6 +182,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
         mock_rclone_cls.return_value = MagicMock()
@@ -235,6 +240,7 @@ class TestDbbackupCommand:
         dump_proc = MagicMock()
         dump_proc.stdout = MagicMock()
         dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
         connector.dump.return_value = dump_proc
         mock_get_connector.return_value = connector
 
@@ -252,6 +258,52 @@ class TestDbbackupCommand:
         output = out.getvalue()
         assert "Removing old backup" in output
 
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_dump_uses_communicate_not_wait(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        """Regression: dump proc must use communicate() to drain pipes and avoid deadlock."""
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        dump_proc = MagicMock()
+        dump_proc.stdout = MagicMock()
+        dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
+        connector.dump.return_value = dump_proc
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        call_command("dbbackup", verbosity=0)
+
+        dump_proc.communicate.assert_called_once()
+        dump_proc.wait.assert_not_called()
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_dump_marks_stderr_drained_when_background_drain_used(
+        self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock
+    ):
+        connector = MagicMock()
+        connector.extension = "sqlite3"
+        dump_proc = MagicMock()
+        dump_proc.stdout = MagicMock()
+        dump_proc.stderr = MagicMock()
+        dump_proc.returncode = 0
+        dump_proc.communicate.return_value = (None, b"")
+        connector.dump.return_value = dump_proc
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        with (
+            patch(
+                "django_rclone.management.commands.dbbackup.start_pipe_drain",
+                return_value=(MagicMock(), [b"stderr data"]),
+            ),
+            patch("django_rclone.management.commands.dbbackup.join_pipe_drain", return_value=b"stderr data"),
+        ):
+            call_command("dbbackup", verbosity=0)
+
+        assert dump_proc.stderr is None
+
 
 class TestDbestoreCommand:
     @patch("django_rclone.management.commands.dbrestore.Rclone")
@@ -260,6 +312,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -271,6 +324,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -286,6 +340,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -293,6 +348,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -305,6 +361,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -312,6 +369,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -352,6 +410,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -359,6 +418,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -371,6 +431,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -378,6 +439,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -399,6 +461,7 @@ class TestDbestoreCommand:
             "analytics": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"},
         }
     )
+    @pytest.mark.filterwarnings("ignore:Overriding setting DATABASES can lead to unexpected behavior\\.:UserWarning")
     def test_requires_database_when_multiple_databases(self):
         with pytest.raises(CommandError):
             call_command("dbrestore", interactive=False, verbosity=0)
@@ -409,6 +472,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -416,6 +480,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -433,6 +498,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -440,7 +506,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 1
-        cat_proc.stderr.read.return_value = b"cat failed"
+        cat_proc.communicate.return_value = (None, b"cat failed")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -453,7 +519,7 @@ class TestDbestoreCommand:
         connector = MagicMock()
         restore_proc = MagicMock()
         restore_proc.returncode = 1
-        restore_proc.stderr.read.return_value = b"restore failed"
+        restore_proc.communicate.return_value = (None, b"restore failed")
         connector.restore.return_value = restore_proc
         mock_get_connector.return_value = connector
 
@@ -461,6 +527,7 @@ class TestDbestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
@@ -508,6 +575,64 @@ class TestDbestoreCommand:
         mock_rclone_cls.return_value = MagicMock()
         with pytest.raises(CommandError, match="cannot contain '\\.' or '\\.\\.'"):
             call_command("dbrestore", input_path="./backup.sqlite3", interactive=False, verbosity=0)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_uses_communicate_not_wait(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        """Regression: restore/cat procs must use communicate() to drain pipes and avoid deadlock."""
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+        restore_proc.communicate.assert_called_once()
+        restore_proc.wait.assert_not_called()
+        cat_proc.communicate.assert_called_once()
+        cat_proc.wait.assert_not_called()
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_marks_cat_stderr_drained_when_background_drain_used(
+        self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock
+    ):
+        connector = MagicMock()
+        restore_proc = MagicMock()
+        restore_proc.returncode = 0
+        restore_proc.communicate.return_value = (None, b"")
+        connector.restore.return_value = restore_proc
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.stderr = MagicMock()
+        cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"")
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        with (
+            patch(
+                "django_rclone.management.commands.dbrestore.start_pipe_drain",
+                return_value=(MagicMock(), [b"stderr data"]),
+            ),
+            patch("django_rclone.management.commands.dbrestore.join_pipe_drain", return_value=b"stderr data"),
+        ):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+        assert cat_proc.stderr is None
 
 
 class TestMediabackupCommand:
