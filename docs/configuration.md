@@ -39,6 +39,9 @@ The rclone remote and path where backups are stored. This follows rclone's stand
 # S3 bucket
 "REMOTE": "s3:my-backup-bucket/django-backups"
 
+# Cloudflare R2 (requires no_check_bucket = true in rclone config)
+"REMOTE": "r2_backups:my-backup-bucket/django-backups"
+
 # Google Cloud Storage
 "REMOTE": "gcs:my-bucket/backups"
 
@@ -50,6 +53,43 @@ The rclone remote and path where backups are stored. This follows rclone's stand
 ```
 
 Database backups are stored under `REMOTE/DB_BACKUP_DIR/` and media backups under `REMOTE/MEDIA_BACKUP_DIR/`.
+
+#### Cloudflare R2 Configuration
+
+Cloudflare R2 requires special configuration in your rclone remote. When creating your rclone remote, you must include `no_check_bucket = true`:
+
+```bash
+rclone config create r2_backups s3 \
+  provider=Cloudflare \
+  access_key_id=YOUR_KEY \
+  secret_access_key=YOUR_SECRET \
+  endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com \
+  no_check_bucket=true
+```
+
+Without the `no_check_bucket` setting, R2 will reject uploads with 403 Access Denied errors, even when your API token has the correct Object Read & Write permissions. This is because R2's permission model doesn't allow bucket existence checks with object-only permissions.
+
+Once configured, use it in your Django settings:
+
+```python
+DJANGO_RCLONE = {
+    "REMOTE": "r2_backups:my-backup-bucket/django-backups",
+}
+```
+
+**Finding your Account ID and Endpoint:**
+
+Your R2 endpoint format is `https://ACCOUNT_ID.r2.cloudflarestorage.com`, where `ACCOUNT_ID` can be found in:
+- Cloudflare Dashboard → R2 → Overview (shown on the right sidebar)
+- Or in any R2 bucket's settings
+
+**API Token Permissions:**
+
+When creating an R2 API token, you can choose:
+- **Object Read & Write** - Sufficient for django-rclone operations (recommended)
+- **Admin Read & Write** - Includes bucket management permissions (not needed)
+
+Apply the token to specific buckets for better security, or to all buckets for flexibility.
 
 ### `RCLONE_BINARY`
 

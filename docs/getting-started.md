@@ -38,6 +38,23 @@ rclone config create localbackup local
 
 This creates a remote called `localbackup` that stores files on the local filesystem.
 
+### Cloudflare R2
+
+For [Cloudflare R2](https://developers.cloudflare.com/r2/), you **must** set `no_check_bucket = true`:
+
+```bash
+rclone config create r2_backups s3 \
+  provider=Cloudflare \
+  access_key_id=YOUR_ACCESS_KEY_ID \
+  secret_access_key=YOUR_SECRET_ACCESS_KEY \
+  endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com \
+  no_check_bucket=true
+```
+
+Find your Account ID in the Cloudflare Dashboard → R2 → Overview. Create an API token in Manage R2 API Tokens with Object Read & Write permissions.
+
+**Important:** The `no_check_bucket = true` setting is required for R2. Without it, you'll get 403 Access Denied errors even with correct permissions.
+
 ## Configure Django
 
 Add `django_rclone` to your installed apps and point it at your rclone remote:
@@ -62,6 +79,14 @@ For a cloud remote like S3, it might look like:
 ```python
 DJANGO_RCLONE = {
     "REMOTE": "s3:my-backup-bucket/myproject",
+}
+```
+
+For Cloudflare R2:
+
+```python
+DJANGO_RCLONE = {
+    "REMOTE": "r2_backups:my-backup-bucket/django-backups",
 }
 ```
 
