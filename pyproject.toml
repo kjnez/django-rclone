@@ -1,6 +1,6 @@
 [project]
 name = "django-rclone"
-version = "0.2.0"
+version = "0.2.1"
 description = "rclone wrapper for Django database and media file backups"
 readme = "README.md"
 requires-python = ">=3.12"
