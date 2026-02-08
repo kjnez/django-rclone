@@ -38,6 +38,7 @@ nav:
   - Getting Started: getting-started.md
   - Commands: commands.md
   - Configuration: configuration.md
+  - Storage Providers: providers.md
   - Connectors: connectors.md
   - Signals: signals.md
   - Migrating from django-dbbackup: migration-from-dbbackup.md

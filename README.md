@@ -162,42 +162,7 @@ rclone config create myremote-compressed compress remote=myremote:backups
 
 Or pass `--compress-level` via `RCLONE_FLAGS`.
 
-### Cloudflare R2
-
-[Cloudflare R2](https://developers.cloudflare.com/r2/) is an S3-compatible object storage service with zero egress fees. To use R2 with django-rclone, you need to configure the `no_check_bucket` setting in your rclone remote.
-
-**Why `no_check_bucket` is required:** R2 with Object Read & Write permissions will return 403 Access Denied errors on bucket existence checks. Setting `no_check_bucket = true` skips these checks and allows uploads to proceed normally.
-
-#### Step 1: Create R2 API Token
-
-1. Go to Cloudflare Dashboard → R2 → Manage R2 API Tokens
-2. Create a new API token with:
-   - **Permissions**: Object Read & Write (or Admin Read & Write)
-   - **Bucket**: Select your specific bucket or apply to all buckets
-3. Copy the Access Key ID and Secret Access Key
-
-#### Step 2: Configure rclone remote
-
-```bash
-rclone config create r2_backups s3 \
-  provider=Cloudflare \
-  access_key_id=YOUR_ACCESS_KEY_ID \
-  secret_access_key=YOUR_SECRET_ACCESS_KEY \
-  endpoint=https://ACCOUNT_ID.r2.cloudflarestorage.com \
-  no_check_bucket=true
-```
-
-Or configure interactively with `rclone config` and ensure you set `no_check_bucket = true` in the advanced config.
-
-#### Step 3: Configure Django settings
-
-```python
-DJANGO_RCLONE = {
-    "REMOTE": "r2_backups:my-backup-bucket/django-backups",
-}
-```
-
-Replace `my-backup-bucket` with your actual R2 bucket name.
+See [Storage Providers](https://django-rclone.readthedocs.io/en/latest/providers/) for provider-specific configuration notes (Cloudflare R2, etc.).
 
 ## Supported databases
 
