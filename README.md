@@ -2,11 +2,14 @@
 
 [![CI](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml/badge.svg)](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/django-rclone)](https://pypi.org/project/django-rclone/)
+[![Documentation](https://readthedocs.org/projects/django-rclone/badge/?version=latest)](https://django-rclone.readthedocs.io/)
 [![codecov](https://codecov.io/gh/kjnez/django-rclone/graph/badge.svg)](https://codecov.io/gh/kjnez/django-rclone)
 
 Django database and media backup management commands, powered by [rclone](https://rclone.org/).
 
 django-rclone bridges Django's database layer with rclone's file transfer layer. You get native database dumps piped directly to any of rclone's 70+ supported cloud storage backends -- no temp files, no intermediate archives, no Python reimplementations of what rclone already does.
+
+**[Full documentation](https://django-rclone.readthedocs.io/)**
 
 ## Why rclone instead of Django Storages?
 
