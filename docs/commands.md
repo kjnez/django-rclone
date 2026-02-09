@@ -10,7 +10,7 @@ Dump a database and upload it to the rclone remote.
 python manage.py dbbackup [options]
 ```
 
-**How it works:** The command gets a connector for the database, runs the native dump tool (e.g., `pg_dump`), and pipes stdout directly into `rclone rcat` -- streaming the dump to the remote with no intermediate files.
+**How it works:** The command gets a connector for the database, runs the native dump tool (e.g., `pg_dump`), and pipes stdout directly into `rclone rcat` -- streaming the dump to the remote with no intermediate files. During finalization, django-rclone drains subprocess pipes via `communicate()` and background stderr readers so large stderr output cannot deadlock the pipeline.
 
 ### Options
 
@@ -63,7 +63,7 @@ Download a backup from the rclone remote and restore it into a database.
 python manage.py dbrestore [options]
 ```
 
-**How it works:** The command runs `rclone cat` to stream the backup file and pipes it into the native restore tool (e.g., `pg_restore`) -- again with no intermediate files.
+**How it works:** The command runs `rclone cat` to stream the backup file and pipes it into the native restore tool (e.g., `pg_restore`) -- again with no intermediate files. Process finalization uses the same deadlock-safe pipe draining strategy as `dbbackup`.
 
 ### Options
 

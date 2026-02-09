@@ -203,13 +203,15 @@ Management Commands (dbbackup, dbrestore, mediabackup, mediarestore, listbackups
                           (70+ storage backends)
 ```
 
-Database dumps stream directly from the dump process into `rclone rcat` via Unix pipes. No intermediate files are written. Restores work in reverse: `rclone cat` streams into the database restore process.
+Database dumps stream directly from the dump process into `rclone rcat` via Unix pipes. No intermediate files are written. Restores work in reverse: `rclone cat` streams into the database restore process. Subprocess finalization is centralized and deadlock-safe (pipe draining + stderr collection).
 
 Media backups use `rclone sync`, which is incremental by default -- only changed files are transferred.
 
 ## Development
 
 Contributions are welcome. This project enforces **100% test coverage** -- all new code must be fully covered by tests. The CI pipeline will fail if coverage drops below 100%.
+
+CI also includes subprocess guardrail tests to prevent `wait()`-based pipe deadlocks and to keep raw `Popen(...)` usage confined to the wrapper modules.
 
 ```bash
 uv sync                                  # Install dependencies

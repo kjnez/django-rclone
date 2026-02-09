@@ -2,6 +2,8 @@
 
 django-rclone uses a strategy pattern for database connectors. Each connector wraps a database's native dump/restore tools and exposes them as streaming subprocesses.
 
+Connectors are responsible for process creation only. The management commands own process finalization (pipe draining, stderr collection, and exit handling) through shared subprocess utilities.
+
 ## Built-in connectors
 
 ### PostgreSQL -- `PgDumpConnector`
@@ -201,4 +203,4 @@ When writing custom connectors:
 
 - **Never pass passwords as command-line arguments.** Use environment variables (`PGPASSWORD`, `MYSQL_PWD`) or authentication files (`.pgpass`, `.my.cnf`).
 - **Always use `subprocess.PIPE`** for stdout (dump) and stdin (restore) to enable streaming.
-- **Return the Popen object** -- don't call `communicate()` or `wait()`. The management command handles process lifecycle.
+- **Return the Popen object** -- don't call `communicate()` or `wait()`. The management command handles process lifecycle using centralized deadlock-safe finalization.

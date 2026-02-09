@@ -78,6 +78,6 @@ Management Commands (dbbackup, dbrestore, mediabackup, mediarestore, listbackups
                           (70+ storage backends)
 ```
 
-Database dumps stream directly from the dump process into `rclone rcat` via Unix pipes. No intermediate files are written. Restores work in reverse: `rclone cat` streams into the database restore process.
+Database dumps stream directly from the dump process into `rclone rcat` via Unix pipes. No intermediate files are written. Restores work in reverse: `rclone cat` streams into the database restore process. The command layer finalizes subprocesses with centralized deadlock-safe pipe draining.
 
 Media backups use `rclone sync`, which is incremental by default -- only changed files are transferred.
