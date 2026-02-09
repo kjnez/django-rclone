@@ -5,13 +5,21 @@ on:
     branches: [master]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run ty check
@@ -27,10 +35,16 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uv sync --frozen
       - run: uv pip install "django~=${{ matrix.django-version }}.0"
-      - run: uv run pytest --cov --cov-branch --cov-report=xml
+      - if: matrix.python-version != '3.12' || matrix.django-version != '5.2'
+        run: uv run pytest
+      - if: matrix.python-version == '3.12' && matrix.django-version == '5.2'
+        run: uv run pytest --cov --cov-branch --cov-report=xml
       - name: Upload coverage reports to Codecov
+        if: matrix.python-version == '3.12' && matrix.django-version == '5.2'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
