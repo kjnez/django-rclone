@@ -28,7 +28,6 @@ django-rclone takes a different approach: **delegate everything that isn't Djang
 | **Media backup** | Tar archive, then upload | `rclone sync` (incremental, no archiving) |
 | **Backup listing** | Filename regex parsing | `rclone lsjson` (structured JSON) |
 | **Temp files** | `SpooledTemporaryFile` | None -- pipes directly via `rclone rcat` |
-| **DB passwords** | Passed via CLI args (visible in `ps`) | Env vars for PostgreSQL/MySQL (`PGPASSWORD`, `MYSQL_PWD`) |
 
 The result is significantly less code doing significantly less work. Storage abstraction, encryption, compression, and incremental sync are all rclone's problem -- django-rclone only owns what Django must own: database connectors, management commands, and signals.
 
