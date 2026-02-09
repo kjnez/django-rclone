@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml/badge.svg)](https://github.com/kjnez/django-rclone/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/django-rclone)](https://pypi.org/project/django-rclone/)
+[![Downloads](https://img.shields.io/pypi/dm/django-rclone)](https://pypi.org/project/django-rclone/)
 [![Documentation](https://readthedocs.org/projects/django-rclone/badge/?version=latest)](https://django-rclone.readthedocs.io/)
 [![codecov](https://codecov.io/gh/kjnez/django-rclone/graph/badge.svg)](https://codecov.io/gh/kjnez/django-rclone)
 [![Python versions](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)](https://pypi.org/project/django-rclone/)
