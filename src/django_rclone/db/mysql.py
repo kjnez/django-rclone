@@ -4,6 +4,7 @@ import os
 import subprocess
 from typing import Any
 
+from ..exceptions import ConnectorError
 from .base import BaseConnector
 
 
@@ -38,20 +39,34 @@ class MysqlDumpConnector(BaseConnector):
     def dump(self) -> subprocess.Popen[bytes]:
         """Dump MySQL database using mysqldump."""
         cmd = ["mysqldump", "--quick", *self._common_args(), self.name]
-        return subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=self._env(),
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._env(),
+            )
+        except OSError as exc:
+            raise self._command_error("mysqldump", exc) from exc
 
     def restore(self, stdin: Any) -> subprocess.Popen[bytes]:
         """Restore MySQL database from stdin."""
         cmd = ["mysql", *self._common_args(), self.name]
-        return subprocess.Popen(
-            cmd,
-            stdin=stdin,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=self._env(),
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdin=stdin,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._env(),
+            )
+        except OSError as exc:
+            raise self._command_error("mysql", exc) from exc
+
+    @staticmethod
+    def _command_error(binary: str, exc: OSError) -> ConnectorError:
+        if exc.errno == 2:
+            return ConnectorError(
+                f"Database command '{binary}' not found. Ensure required database client tools are installed."
+            )
+        return ConnectorError(str(exc))

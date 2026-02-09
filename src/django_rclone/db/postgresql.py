@@ -35,12 +35,15 @@ class PgDumpConnector(BaseConnector):
     def dump(self) -> subprocess.Popen[bytes]:
         """Dump PostgreSQL database using pg_dump in custom format."""
         cmd = ["pg_dump", "--format=custom", "--no-password", *self._common_args(), self.name]
-        return subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=self._env(),
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._env(),
+            )
+        except OSError as exc:
+            raise self._command_error("pg_dump", exc) from exc
 
     def restore(self, stdin: Any) -> subprocess.Popen[bytes]:
         """Restore PostgreSQL database using pg_restore."""
@@ -55,13 +58,24 @@ class PgDumpConnector(BaseConnector):
             self.name,
             *self._common_args(),
         ]
-        return subprocess.Popen(
-            cmd,
-            stdin=stdin,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=self._env(),
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdin=stdin,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._env(),
+            )
+        except OSError as exc:
+            raise self._command_error("pg_restore", exc) from exc
+
+    @staticmethod
+    def _command_error(binary: str, exc: OSError) -> ConnectorError:
+        if exc.errno == 2:
+            return ConnectorError(
+                f"Database command '{binary}' not found. Ensure required database client tools are installed."
+            )
+        return ConnectorError(str(exc))
 
 
 class PgDumpGisConnector(PgDumpConnector):
@@ -88,7 +102,10 @@ class PgDumpGisConnector(PgDumpConnector):
         if self.port:
             cmd += ["-p", self.port]
         cmd.append(self.name)
-        return subprocess.run(cmd, capture_output=True, env=self._env())
+        try:
+            return subprocess.run(cmd, capture_output=True, env=self._env())
+        except OSError as exc:
+            raise self._command_error("psql", exc) from exc
 
     def restore(self, stdin: Any) -> subprocess.Popen[bytes]:
         """Enable PostGIS extension, then restore."""

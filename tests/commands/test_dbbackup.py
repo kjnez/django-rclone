@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 
-from django_rclone.exceptions import RcloneError
+from django_rclone.exceptions import ConnectorError, RcloneError
 from django_rclone.signals import post_db_backup, pre_db_backup
 
 
@@ -234,3 +234,37 @@ class TestDbbackupCommand:
             call_command("dbbackup", verbosity=0)
 
         mock_finish.assert_called_once_with(connector.dump.return_value, stderr_drain=drain, close_stdout=True)
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_rejects_unknown_database_alias(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_rclone_cls.return_value = MagicMock()
+
+        with pytest.raises(CommandError, match="not configured"):
+            call_command("dbbackup", database="missing", verbosity=0)
+
+        mock_get_connector.assert_not_called()
+
+    @patch("django_rclone.management.commands.dbbackup.Rclone")
+    @patch("django_rclone.management.commands.dbbackup.get_connector")
+    def test_dump_connector_error_exits(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        connector.dump.side_effect = ConnectorError("pg_dump not found")
+        connector.extension = "dump"
+        mock_get_connector.return_value = connector
+        mock_rclone_cls.return_value = MagicMock()
+
+        with pytest.raises(SystemExit):
+            call_command("dbbackup", verbosity=0)
+
+    def test_parse_modtime_invalid_falls_back_to_min(self):
+        from django_rclone.management.commands.dbbackup import Command
+
+        parsed = Command._parse_modtime("not-a-timestamp")
+        assert parsed.year == 1
+
+    def test_parse_modtime_naive_assumes_utc(self):
+        from django_rclone.management.commands.dbbackup import Command
+
+        parsed = Command._parse_modtime("2024-01-01T12:00:00")
+        assert parsed.tzinfo is not None

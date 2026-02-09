@@ -36,7 +36,10 @@ class Rclone:
 
     def _run(self, args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
         cmd = self._base_cmd() + args
-        result = subprocess.run(cmd, capture_output=True, **kwargs)
+        try:
+            result = subprocess.run(cmd, capture_output=True, **kwargs)
+        except OSError as exc:
+            raise self._command_error(cmd, exc) from exc
         if result.returncode != 0:
             raise RcloneError(cmd, result.returncode, result.stderr.decode(errors="replace"))
         return result
@@ -52,7 +55,10 @@ class Rclone:
     def rcat(self, path: str, stdin: IO[bytes]) -> None:
         """Pipe data from stdin to a remote file via `rclone rcat`."""
         cmd = [*self._base_cmd(), "rcat", self._remote_path(path)]
-        proc = subprocess.Popen(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            proc = subprocess.Popen(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError as exc:
+            raise self._command_error(cmd, exc) from exc
         _, stderr = proc.communicate()
         if proc.returncode != 0:
             raise RcloneError(cmd, proc.returncode, stderr.decode(errors="replace"))
@@ -60,7 +66,10 @@ class Rclone:
     def cat(self, path: str) -> subprocess.Popen[bytes]:
         """Stream data from a remote file via `rclone cat`. Returns a Popen with stdout."""
         cmd = [*self._base_cmd(), "cat", self._remote_path(path)]
-        return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError as exc:
+            raise self._command_error(cmd, exc) from exc
 
     def sync(self, src: str, dst: str, **flags: Any) -> None:
         """Sync source to destination directory."""
@@ -103,3 +112,13 @@ class Rclone:
     def moveto(self, src: str, dst: str) -> None:
         """Move one remote object to another path."""
         self._run(["moveto", self._remote_path(src), self._remote_path(dst)])
+
+    @staticmethod
+    def _command_error(cmd: list[str], exc: OSError) -> RcloneError:
+        if exc.errno == 2:
+            return RcloneError(
+                cmd,
+                127,
+                f"Command not found: {cmd[0]}. Ensure rclone is installed and RCLONE_BINARY is correct.",
+            )
+        return RcloneError(cmd, 1, str(exc))

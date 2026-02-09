@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from django.conf import settings as django_settings
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from django_rclone.db.registry import get_connector
+from django_rclone.exceptions import ConnectorError, RcloneError
 from django_rclone.filenames import database_from_backup_name, validate_db_filename_template
 from django_rclone.process_utils import begin_stderr_drain, close_process_stdout, finish_process
 from django_rclone.rclone import Rclone
@@ -47,16 +50,24 @@ class Command(BaseCommand):
                     "Multiple databases are configured. Please specify which one to restore with --database."
                 )
             database = next(iter(django_settings.DATABASES))
+        elif database not in django_settings.DATABASES:
+            raise CommandError(f"Database '{database}' is not configured.")
 
         connector = get_connector(database)
         rclone = Rclone()
         backup_dir = str(get_setting("DB_BACKUP_DIR"))
         template = str(get_setting("DB_FILENAME_TEMPLATE"))
+        date_format = str(get_setting("DB_DATE_FORMAT"))
         validate_db_filename_template(template)
 
         if not input_path:
-            input_path = self._find_latest(rclone, database, backup_dir, template)
+            input_path = self._find_latest(rclone, database, backup_dir, template, date_format)
         input_path = self._validate_input_path(input_path)
+        backup_database = database_from_backup_name(input_path, template, date_format=date_format)
+        if backup_database is not None and backup_database != database:
+            raise CommandError(
+                f"Backup '{input_path}' appears to belong to database '{backup_database}', not '{database}'."
+            )
 
         remote_path = f"{backup_dir}/{input_path}"
 
@@ -72,9 +83,22 @@ class Command(BaseCommand):
             self.stdout.write(f"Restoring database '{database}' from {remote_path}")
 
         # Stream from rclone to restore process
-        cat_proc = rclone.cat(remote_path)
+        try:
+            cat_proc = rclone.cat(remote_path)
+        except RcloneError as exc:
+            self.stderr.write(f"rclone cat failed: {exc.stderr}")
+            raise SystemExit(1) from exc
         assert cat_proc.stdout is not None
-        restore_proc = connector.restore(stdin=cat_proc.stdout)
+        try:
+            restore_proc = connector.restore(stdin=cat_proc.stdout)
+        except ConnectorError as exc:
+            close_process_stdout(cat_proc)
+            _, cat_stderr = finish_process(cat_proc, stderr_drain=begin_stderr_drain(cat_proc))
+            stderr = cat_stderr.decode(errors="replace") if cat_stderr else ""
+            if stderr:
+                self.stderr.write(f"rclone cat failed: {stderr}")
+            self.stderr.write(f"Database restore failed: {exc}")
+            raise SystemExit(1) from exc
         cat_stderr_drain = begin_stderr_drain(cat_proc)
         close_process_stdout(cat_proc)
 
@@ -97,17 +121,18 @@ class Command(BaseCommand):
         if verbosity >= 1:
             self.stdout.write(self.style.SUCCESS(f"Restore completed from: {remote_path}"))
 
-    def _find_latest(self, rclone: Rclone, database: str, backup_dir: str, template: str) -> str:
+    def _find_latest(self, rclone: Rclone, database: str, backup_dir: str, template: str, date_format: str) -> str:
         files = rclone.lsjson(backup_dir)
         db_files = [
             f
             for f in files
-            if not f.get("IsDir", False) and database_from_backup_name(str(f["Name"]), template) == database
+            if not f.get("IsDir", False)
+            and database_from_backup_name(str(f["Name"]), template, date_format=date_format) == database
         ]
         if not db_files:
             self.stderr.write(f"No backups found for database '{database}'")
             raise SystemExit(1)
-        db_files.sort(key=lambda f: f["ModTime"], reverse=True)
+        db_files.sort(key=lambda f: self._parse_modtime(str(f["ModTime"])), reverse=True)
         return db_files[0]["Name"]
 
     def _validate_input_path(self, input_path: str) -> str:
@@ -121,3 +146,13 @@ class Command(BaseCommand):
         if not parts:  # pragma: no cover - guarded by the empty check above
             raise CommandError("--input-path must point to a file under DB_BACKUP_DIR.")
         return "/".join(parts)
+
+    @staticmethod
+    def _parse_modtime(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.min.replace(tzinfo=UTC)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)

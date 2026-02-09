@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 
+from django_rclone.exceptions import ConnectorError, RcloneError
 from django_rclone.signals import post_db_restore, pre_db_restore
 
 
@@ -24,7 +25,7 @@ class TestDbrestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
-        cat_proc.communicate.return_value = (None, b"")
+        cat_proc.communicate.return_value = (None, b"cat stderr")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
         return connector, rclone
@@ -42,6 +43,46 @@ class TestDbrestoreCommand:
 
         rclone.cat.assert_called_once_with("db/default-2024-01-15-120000.sqlite3")
         connector.restore.assert_called_once()
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    @override_settings(
+        DATABASES={
+            "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"},
+            "foo-bar": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"},
+        }
+    )
+    @pytest.mark.filterwarnings("ignore:Overriding setting DATABASES can lead to unexpected behavior\\.:UserWarning")
+    def test_restore_latest_supports_hyphenated_database_alias(
+        self,
+        mock_get_connector: MagicMock,
+        mock_rclone_cls: MagicMock,
+    ):
+        _, rclone = self._setup_success(mock_get_connector, mock_rclone_cls)
+        rclone.lsjson.return_value = [
+            {"Name": "foo-bar-2024-01-15-120000.sqlite3", "ModTime": "2024-01-15T12:00:00Z"},
+        ]
+
+        call_command("dbrestore", database="foo-bar", verbosity=0, interactive=False)
+
+        rclone.cat.assert_called_once_with("db/foo-bar-2024-01-15-120000.sqlite3")
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_latest_sorts_modtime_by_instant(
+        self,
+        mock_get_connector: MagicMock,
+        mock_rclone_cls: MagicMock,
+    ):
+        _, rclone = self._setup_success(mock_get_connector, mock_rclone_cls)
+        rclone.lsjson.return_value = [
+            {"Name": "default-2024-01-02-000000.sqlite3", "ModTime": "2024-01-02T00:00:00+00:00"},
+            {"Name": "default-2024-01-01-233000.sqlite3", "ModTime": "2024-01-01T23:30:00-02:00"},
+        ]
+
+        call_command("dbrestore", verbosity=0, interactive=False)
+
+        rclone.cat.assert_called_once_with("db/default-2024-01-01-233000.sqlite3")
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
@@ -95,6 +136,33 @@ class TestDbrestoreCommand:
         call_command("dbrestore", database="default", input_path="backup.sqlite3", verbosity=0, interactive=False)
 
         mock_get_connector.assert_called_once_with("default")
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_rejects_unknown_database_alias(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        mock_rclone_cls.return_value = MagicMock()
+
+        with pytest.raises(CommandError, match="not configured"):
+            call_command("dbrestore", database="missing", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+        mock_get_connector.assert_not_called()
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_rejects_input_path_for_other_database(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector, rclone = self._setup_success(mock_get_connector, mock_rclone_cls)
+
+        with pytest.raises(CommandError, match="appears to belong to database"):
+            call_command(
+                "dbrestore",
+                database="default",
+                input_path="analytics-2024-01-15-120000.sqlite3",
+                verbosity=0,
+                interactive=False,
+            )
+
+        rclone.cat.assert_not_called()
+        connector.restore.assert_not_called()
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
@@ -161,6 +229,19 @@ class TestDbrestoreCommand:
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_cat_command_error_exits(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        rclone.cat.side_effect = RcloneError(["rclone", "cat"], 127, "not found")
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
     def test_restore_process_failure(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
         connector = MagicMock()
         restore_proc = MagicMock()
@@ -173,12 +254,60 @@ class TestDbrestoreCommand:
         cat_proc = MagicMock()
         cat_proc.stdout = MagicMock()
         cat_proc.returncode = 0
+        cat_proc.communicate.return_value = (None, b"cat stderr")
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        with pytest.raises(SystemExit):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_connector_error_exits(self, mock_get_connector: MagicMock, mock_rclone_cls: MagicMock):
+        connector = MagicMock()
+        connector.restore.side_effect = ConnectorError("pg_restore not found")
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        cat_proc.returncode = 0
         cat_proc.communicate.return_value = (None, b"")
         rclone.cat.return_value = cat_proc
         mock_rclone_cls.return_value = rclone
 
         with pytest.raises(SystemExit):
             call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False)
+
+    @patch("django_rclone.management.commands.dbrestore.Rclone")
+    @patch("django_rclone.management.commands.dbrestore.get_connector")
+    def test_restore_connector_error_reports_cat_stderr(
+        self,
+        mock_get_connector: MagicMock,
+        mock_rclone_cls: MagicMock,
+    ):
+        connector = MagicMock()
+        connector.restore.side_effect = ConnectorError("pg_restore not found")
+        mock_get_connector.return_value = connector
+
+        rclone = MagicMock()
+        cat_proc = MagicMock()
+        cat_proc.stdout = MagicMock()
+        rclone.cat.return_value = cat_proc
+        mock_rclone_cls.return_value = rclone
+
+        stderr = StringIO()
+        with (
+            patch("django_rclone.management.commands.dbrestore.begin_stderr_drain", return_value=None),
+            patch(
+                "django_rclone.management.commands.dbrestore.finish_process",
+                return_value=(b"", b"cat stderr"),
+            ),
+            pytest.raises(SystemExit),
+        ):
+            call_command("dbrestore", input_path="backup.sqlite3", verbosity=0, interactive=False, stderr=stderr)
+
+        assert "rclone cat failed: cat stderr" in stderr.getvalue()
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")
@@ -197,6 +326,18 @@ class TestDbrestoreCommand:
         command = Command()
         with pytest.raises(CommandError, match="cannot be empty"):
             command._validate_input_path("")
+
+    def test_parse_modtime_invalid_falls_back_to_min(self):
+        from django_rclone.management.commands.dbrestore import Command
+
+        parsed = Command._parse_modtime("bad-timestamp")
+        assert parsed.year == 1
+
+    def test_parse_modtime_naive_assumes_utc(self):
+        from django_rclone.management.commands.dbrestore import Command
+
+        parsed = Command._parse_modtime("2024-01-01T12:00:00")
+        assert parsed.tzinfo is not None
 
     @patch("django_rclone.management.commands.dbrestore.Rclone")
     @patch("django_rclone.management.commands.dbrestore.get_connector")

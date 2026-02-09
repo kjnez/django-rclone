@@ -63,6 +63,17 @@ class TestDatabaseFromBackupName:
         template = "{database}-{datetime}.{ext}"
         assert database_from_backup_name("default-2024-01-15-120000.sqlite3", template) == "default"
 
+    def test_extracts_hyphenated_database_when_datetime_is_constrained(self):
+        template = "{database}-{datetime}.{ext}"
+        assert (
+            database_from_backup_name(
+                "foo-bar-2024-01-15-120000.sqlite3",
+                template,
+                date_format="%Y-%m-%d-%H%M%S",
+            )
+            == "foo-bar"
+        )
+
     def test_returns_none_for_non_matching_name(self):
         template = "{database}-{datetime}.{ext}"
         assert database_from_backup_name("not-a-backup-name", template) is None

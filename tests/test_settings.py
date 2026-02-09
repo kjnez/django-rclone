@@ -31,3 +31,40 @@ class TestGetSetting:
         assert get_setting("RCLONE_FLAGS") == []
         assert get_setting("CONNECTORS") == {}
         assert get_setting("CONNECTOR_MAPPING") == {}
+
+    def test_default_mutable_values_are_copied(self):
+        flags: list[str] = get_setting("RCLONE_FLAGS")  # type: ignore[assignment]
+        connectors: dict[str, str] = get_setting("CONNECTORS")  # type: ignore[assignment]
+        mapping: dict[str, str] = get_setting("CONNECTOR_MAPPING")  # type: ignore[assignment]
+
+        assert isinstance(flags, list)
+        assert isinstance(connectors, dict)
+        assert isinstance(mapping, dict)
+
+        flags.append("--fast-list")
+        connectors["default"] = "django_rclone.db.sqlite.SqliteConnector"
+        mapping["django.db.backends.oracle"] = "django_rclone.db.sqlite.SqliteConnector"
+
+        assert get_setting("RCLONE_FLAGS") == []
+        assert get_setting("CONNECTORS") == {}
+        assert get_setting("CONNECTOR_MAPPING") == {}
+
+    @override_settings(
+        DJANGO_RCLONE={
+            "REMOTE": "myremote:path",
+            "RCLONE_FLAGS": ["--checksum"],
+            "CONNECTORS": {"default": "django_rclone.db.sqlite.SqliteConnector"},
+        }
+    )
+    def test_user_mutable_values_are_copied(self):
+        flags: list[str] = get_setting("RCLONE_FLAGS")  # type: ignore[assignment]
+        connectors: dict[str, str] = get_setting("CONNECTORS")  # type: ignore[assignment]
+
+        assert isinstance(flags, list)
+        assert isinstance(connectors, dict)
+
+        flags.append("--fast-list")
+        connectors["analytics"] = "django_rclone.db.postgresql.PgDumpConnector"
+
+        assert get_setting("RCLONE_FLAGS") == ["--checksum"]
+        assert get_setting("CONNECTORS") == {"default": "django_rclone.db.sqlite.SqliteConnector"}

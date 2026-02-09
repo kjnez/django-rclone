@@ -79,6 +79,24 @@ class TestRun:
         assert exc_info.value.returncode == 1
         assert "something failed" in exc_info.value.stderr
 
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_missing_binary_raises_rclone_error(self, mock_run: MagicMock):
+        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "rclone")
+        rc = Rclone(remote="r:b", binary="rclone")
+        with pytest.raises(RcloneError) as exc_info:
+            rc._run(["version"])
+        assert exc_info.value.returncode == 127
+        assert "not found" in exc_info.value.stderr
+
+    @patch("django_rclone.rclone.subprocess.run")
+    def test_oserror_raises_rclone_error(self, mock_run: MagicMock):
+        mock_run.side_effect = OSError(13, "Permission denied")
+        rc = Rclone(remote="r:b", binary="rclone")
+        with pytest.raises(RcloneError) as exc_info:
+            rc._run(["version"])
+        assert exc_info.value.returncode == 1
+        assert "Permission denied" in exc_info.value.stderr
+
 
 class TestRcat:
     @patch("django_rclone.rclone.subprocess.Popen")
@@ -108,6 +126,15 @@ class TestRcat:
         with pytest.raises(RcloneError):
             rc.rcat("db/backup.dump", stdin=io.BytesIO(b"data"))
 
+    @patch("django_rclone.rclone.subprocess.Popen")
+    def test_missing_binary_raises(self, mock_popen: MagicMock):
+        mock_popen.side_effect = FileNotFoundError(2, "No such file or directory", "rclone")
+        rc = Rclone(remote="r:b", binary="rclone")
+
+        with pytest.raises(RcloneError) as exc_info:
+            rc.rcat("db/backup.dump", stdin=io.BytesIO(b"data"))
+        assert exc_info.value.returncode == 127
+
 
 class TestCat:
     @patch("django_rclone.rclone.subprocess.Popen")
@@ -121,6 +148,15 @@ class TestCat:
         mock_popen.assert_called_once()
         call_args = mock_popen.call_args
         assert call_args[0][0] == ["rclone", "cat", "r:b/db/backup.dump"]
+
+    @patch("django_rclone.rclone.subprocess.Popen")
+    def test_missing_binary_raises(self, mock_popen: MagicMock):
+        mock_popen.side_effect = FileNotFoundError(2, "No such file or directory", "rclone")
+        rc = Rclone(remote="r:b", binary="rclone")
+
+        with pytest.raises(RcloneError) as exc_info:
+            rc.cat("db/backup.dump")
+        assert exc_info.value.returncode == 127
 
 
 class TestLsjson:

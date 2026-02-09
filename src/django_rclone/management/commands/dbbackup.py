@@ -4,10 +4,11 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from django.conf import settings as django_settings
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from django_rclone.db.registry import get_connector
-from django_rclone.exceptions import RcloneError
+from django_rclone.exceptions import ConnectorError, RcloneError
 from django_rclone.filenames import database_from_backup_name, validate_db_filename_template
 from django_rclone.process_utils import begin_stderr_drain, finish_process
 from django_rclone.rclone import Rclone
@@ -35,6 +36,9 @@ class Command(BaseCommand):
         database = str(options["database"])
         clean = bool(options["clean"])
         verbosity = int(options["verbosity"])  # type: ignore[arg-type]
+
+        if database not in django_settings.DATABASES:
+            raise CommandError(f"Database '{database}' is not configured.")
 
         connector = get_connector(database)
         rclone = Rclone()
@@ -65,7 +69,11 @@ class Command(BaseCommand):
             self.stdout.write(f"Backing up database '{database}' to {remote_path}")
 
         # Dump database and stream to a temporary remote object first.
-        dump_proc = connector.dump()
+        try:
+            dump_proc = connector.dump()
+        except ConnectorError as exc:
+            self.stderr.write(f"Database dump failed: {exc}")
+            raise SystemExit(1) from exc
         assert dump_proc.stdout is not None
         dump_stderr_drain = begin_stderr_drain(dump_proc)
         upload_error: RcloneError | None = None
@@ -103,15 +111,17 @@ class Command(BaseCommand):
     def _cleanup(self, rclone: Rclone, database: str, backup_dir: str, verbosity: int) -> None:
         keep = int(get_setting("DB_CLEANUP_KEEP"))  # type: ignore[arg-type]
         template = str(get_setting("DB_FILENAME_TEMPLATE"))
+        date_format = str(get_setting("DB_DATE_FORMAT"))
         files = rclone.lsjson(backup_dir)
         # Filter to files matching this database
         db_files = [
             f
             for f in files
-            if not f.get("IsDir", False) and database_from_backup_name(str(f["Name"]), template) == database
+            if not f.get("IsDir", False)
+            and database_from_backup_name(str(f["Name"]), template, date_format=date_format) == database
         ]
-        # Sort by modification time descending
-        db_files.sort(key=lambda f: f["ModTime"], reverse=True)
+        # Sort by modification time descending.
+        db_files.sort(key=lambda f: self._parse_modtime(str(f["ModTime"])), reverse=True)
 
         to_delete = db_files[keep:]
         for f in to_delete:
@@ -123,3 +133,13 @@ class Command(BaseCommand):
     def _safe_delete(self, rclone: Rclone, path: str) -> None:
         with suppress(RcloneError):
             rclone.delete(path)
+
+    @staticmethod
+    def _parse_modtime(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.min.replace(tzinfo=UTC)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)

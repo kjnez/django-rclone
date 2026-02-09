@@ -8,13 +8,35 @@ from django.core.management.base import CommandError
 
 ALLOWED_TEMPLATE_FIELDS = {"database", "datetime", "ext"}
 
+DATE_DIRECTIVE_PATTERNS = {
+    "%a": r"[A-Za-z]{3}",
+    "%A": r"[A-Za-z]+",
+    "%w": r"\d",
+    "%d": r"\d{2}",
+    "%b": r"[A-Za-z]{3}",
+    "%B": r"[A-Za-z]+",
+    "%m": r"\d{2}",
+    "%y": r"\d{2}",
+    "%Y": r"\d{4}",
+    "%H": r"\d{2}",
+    "%I": r"\d{2}",
+    "%M": r"\d{2}",
+    "%S": r"\d{2}",
+    "%f": r"\d{6}",
+    "%z": r"(?:[+-]\d{4}|[+-]\d{2}:\d{2})",
+    "%j": r"\d{3}",
+    "%U": r"\d{2}",
+    "%W": r"\d{2}",
+    "%%": r"%",
+}
+
 
 def validate_db_filename_template(template: str) -> None:
     _compile_db_filename_pattern(template)
 
 
-def database_from_backup_name(filename: str, template: str) -> str | None:
-    pattern = _compile_db_filename_pattern(template)
+def database_from_backup_name(filename: str, template: str, date_format: str | None = None) -> str | None:
+    pattern = _compile_db_filename_pattern(template, date_format)
     match = pattern.fullmatch(filename)
     if not match:
         return None
@@ -22,7 +44,7 @@ def database_from_backup_name(filename: str, template: str) -> str | None:
 
 
 @lru_cache(maxsize=16)
-def _compile_db_filename_pattern(template: str) -> re.Pattern[str]:
+def _compile_db_filename_pattern(template: str, date_format: str | None = None) -> re.Pattern[str]:
     parsed = list(Formatter().parse(template))
     if not parsed:
         raise CommandError("DB_FILENAME_TEMPLATE cannot be empty.")
@@ -68,9 +90,10 @@ def _compile_db_filename_pattern(template: str) -> re.Pattern[str]:
 
         if field_name == "database":
             saw_database = True
+        datetime_pattern = _date_format_to_regex(date_format) if date_format else r"[^/]+?"
         field_patterns = {
             "database": r"(?P<database>[^/]+?)",
-            "datetime": r"(?P<datetime>[^/]+?)",
+            "datetime": f"(?P<datetime>{datetime_pattern})",
             "ext": r"(?P<ext>[^/]+)",
         }
         parts.append(field_patterns[field_name])
@@ -82,3 +105,17 @@ def _compile_db_filename_pattern(template: str) -> re.Pattern[str]:
         )
 
     return re.compile("".join(parts))
+
+
+def _date_format_to_regex(date_format: str) -> str:
+    parts: list[str] = []
+    i = 0
+    while i < len(date_format):
+        if date_format[i] == "%" and i + 1 < len(date_format):
+            token = date_format[i : i + 2]
+            parts.append(DATE_DIRECTIVE_PATTERNS.get(token, re.escape(token)))
+            i += 2
+            continue
+        parts.append(re.escape(date_format[i]))
+        i += 1
+    return "".join(parts)

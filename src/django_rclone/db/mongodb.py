@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from typing import Any
 
+from ..exceptions import ConnectorError
 from .base import BaseConnector
 
 
@@ -44,11 +45,14 @@ class MongoDumpConnector(BaseConnector):
             *self._auth_args(),
             "--archive",
         ]
-        return subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except OSError as exc:
+            raise self._command_error("mongodump", exc) from exc
 
     def restore(self, stdin: Any) -> subprocess.Popen[bytes]:
         """Restore MongoDB database using mongorestore from archive stdin."""
@@ -60,9 +64,20 @@ class MongoDumpConnector(BaseConnector):
             "--drop",
             "--archive",
         ]
-        return subprocess.Popen(
-            cmd,
-            stdin=stdin,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            return subprocess.Popen(
+                cmd,
+                stdin=stdin,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except OSError as exc:
+            raise self._command_error("mongorestore", exc) from exc
+
+    @staticmethod
+    def _command_error(binary: str, exc: OSError) -> ConnectorError:
+        if exc.errno == 2:
+            return ConnectorError(
+                f"Database command '{binary}' not found. Ensure required database client tools are installed."
+            )
+        return ConnectorError(str(exc))

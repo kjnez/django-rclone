@@ -3,7 +3,10 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from django_rclone.db.mongodb import MongoDumpConnector
+from django_rclone.exceptions import ConnectorError
 
 
 class TestMongoDumpConnector:
@@ -77,3 +80,19 @@ class TestMongoDumpConnector:
         assert "--drop" in cmd
         assert "--archive" in cmd
         assert mock_popen.call_args[1]["stdin"] is stdin_mock
+
+    @patch("django_rclone.db.mongodb.subprocess.Popen")
+    def test_dump_missing_binary_raises_connector_error(self, mock_popen: MagicMock):
+        mock_popen.side_effect = FileNotFoundError(2, "No such file or directory", "mongodump")
+        connector = MongoDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
+
+        with pytest.raises(ConnectorError, match="not found"):
+            connector.dump()
+
+    @patch("django_rclone.db.mongodb.subprocess.Popen")
+    def test_restore_oserror_raises_connector_error(self, mock_popen: MagicMock):
+        mock_popen.side_effect = OSError(13, "Permission denied")
+        connector = MongoDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
+
+        with pytest.raises(ConnectorError, match="Permission denied"):
+            connector.restore(stdin=MagicMock())

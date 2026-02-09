@@ -106,3 +106,13 @@ class TestFormatSize:
 
     def test_petabytes(self):
         assert ListbackupsCommand._format_size(1024**5) == "1.0 PB"
+
+
+class TestParseModtime:
+    def test_invalid_falls_back_to_min(self):
+        parsed = ListbackupsCommand._parse_modtime("bad-timestamp")
+        assert parsed.year == 1
+
+    def test_naive_assumes_utc(self):
+        parsed = ListbackupsCommand._parse_modtime("2024-01-01T12:00:00")
+        assert parsed.tzinfo is not None

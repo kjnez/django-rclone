@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from django.core.management.base import BaseCommand, CommandParser
 
 from django_rclone.filenames import database_from_backup_name, validate_db_filename_template
@@ -37,14 +39,15 @@ class Command(BaseCommand):
     def _list_db(self, rclone: Rclone, database: str) -> None:
         backup_dir = str(get_setting("DB_BACKUP_DIR"))
         template = str(get_setting("DB_FILENAME_TEMPLATE"))
+        date_format = str(get_setting("DB_DATE_FORMAT"))
         validate_db_filename_template(template)
         files = rclone.lsjson(backup_dir)
         files = [f for f in files if not f.get("IsDir", False)]
 
         if database:
-            files = [f for f in files if database_from_backup_name(str(f["Name"]), template) == database]
+            files = [f for f in files if database_from_backup_name(str(f["Name"]), template, date_format) == database]
 
-        files.sort(key=lambda f: f["ModTime"], reverse=True)
+        files.sort(key=lambda f: self._parse_modtime(str(f["ModTime"])), reverse=True)
 
         if not files:
             self.stdout.write("No database backups found.")
@@ -83,3 +86,13 @@ class Command(BaseCommand):
                 return f"{size:.1f} {unit}" if unit != "B" else f"{size} {unit}"
             size /= 1024  # type: ignore[assignment]
         return f"{size:.1f} PB"
+
+    @staticmethod
+    def _parse_modtime(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.min.replace(tzinfo=UTC)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)

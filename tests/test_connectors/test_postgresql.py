@@ -83,6 +83,22 @@ class TestPgDumpConnector:
         assert "-d" in cmd
         assert mock_popen.call_args[1]["stdin"] is stdin_mock
 
+    @patch("django_rclone.db.postgresql.subprocess.Popen")
+    def test_dump_missing_binary_raises_connector_error(self, mock_popen: MagicMock):
+        mock_popen.side_effect = FileNotFoundError(2, "No such file or directory", "pg_dump")
+        connector = PgDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
+
+        with pytest.raises(ConnectorError, match="not found"):
+            connector.dump()
+
+    @patch("django_rclone.db.postgresql.subprocess.Popen")
+    def test_restore_oserror_raises_connector_error(self, mock_popen: MagicMock):
+        mock_popen.side_effect = OSError(13, "Permission denied")
+        connector = PgDumpConnector({"NAME": "mydb", "HOST": "", "PORT": "", "USER": "", "PASSWORD": ""})
+
+        with pytest.raises(ConnectorError, match="Permission denied"):
+            connector.restore(stdin=MagicMock())
+
 
 class TestPgDumpGisConnector:
     def test_extension(self):
@@ -178,3 +194,20 @@ class TestPgDumpGisConnector:
             connector.restore(stdin=None)
 
         mock_popen.assert_not_called()
+
+    @patch("django_rclone.db.postgresql.subprocess.run")
+    def test_enable_postgis_missing_binary_raises_connector_error(self, mock_run: MagicMock):
+        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "psql")
+        connector = PgDumpGisConnector(
+            {
+                "NAME": "geodb",
+                "HOST": "localhost",
+                "PORT": "5432",
+                "USER": "app",
+                "PASSWORD": "secret",
+                "ADMIN_USER": "postgres",
+            }
+        )
+
+        with pytest.raises(ConnectorError, match="not found"):
+            connector._enable_postgis()
