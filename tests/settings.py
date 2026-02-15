@@ -2,13 +2,14 @@ SECRET_KEY = "test-secret-key"
 
 INSTALLED_APPS = [
     "django_rclone",
+    "tests.testapp",
 ]
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": ":memory:",
-    }
+    },
 }
 
 MEDIA_ROOT = "/tmp/django_rclone_test_media"

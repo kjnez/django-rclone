@@ -35,6 +35,10 @@ dev = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.1",
 ]
+integration = [
+    "psycopg[binary]",
+    "mysqlclient",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -51,6 +55,9 @@ exclude = ["django-dbbackup"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+"**/migrations/*.py" = ["RUF012"]
+
 [tool.ruff.format]
 quote-style = "double"
 
@@ -58,6 +65,12 @@ quote-style = "double"
 DJANGO_SETTINGS_MODULE = "tests.settings"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+addopts = '-m "not integration"'
+markers = [
+    "integration: marks tests as integration tests",
+    "requires_postgres: requires a running PostgreSQL instance",
+    "requires_mysql: requires a running MySQL instance",
+]
 
 [tool.coverage.run]
 source = ["django_rclone"]
@@ -70,4 +83,4 @@ fail_under = 100
 python-version = "3.12"
 
 [tool.ty.src]
-exclude = ["django-dbbackup"]
+exclude = ["django-dbbackup", "tests/integration", "tests/testapp"]

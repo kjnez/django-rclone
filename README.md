@@ -214,12 +214,17 @@ Contributions are welcome. This project enforces **100% test coverage** -- all n
 CI also includes subprocess guardrail tests to prevent `wait()`-based pipe deadlocks and to keep raw `Popen(...)` usage confined to the wrapper modules.
 
 ```bash
-uv sync                                  # Install dependencies
-uv run pytest --cov --cov-branch          # Run tests with coverage
+uv sync                                  # Install runtime + dev deps (tests/lint/type/docs)
+uv run pytest --cov --cov-branch         # Unit tests (integration excluded by default)
+uv sync --group integration               # Install DB integration test dependencies
+uv run pytest tests/integration -m integration -q       # Integration tests (requires tools/services)
 uv run ruff check .                      # Lint
 uv run ruff format --check .             # Check formatting
 uv run ty check                          # Type check
+uv run mkdocs build --strict             # Build docs
 ```
+
+For full integration setup details (Docker services, required binaries, env vars), see `docs/testing.md`.
 
 ## License
 

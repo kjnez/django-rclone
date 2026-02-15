@@ -118,6 +118,7 @@ This uses `rclone sync`, so only changed files are transferred on subsequent run
 
 ## Next steps
 
+- [Testing](testing.md) -- local unit/integration workflows
 - [Configuration](configuration.md) -- all available settings
 - [Commands](commands.md) -- detailed command reference
 - [Connectors](connectors.md) -- database connector details

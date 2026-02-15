@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
-      - run: uv sync --frozen
+      - run: uv sync --frozen --no-group integration
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run ty check
@@ -37,7 +37,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
-      - run: uv sync --frozen
+      - run: uv sync --frozen --no-group integration
       - run: uv pip install "django~=${{ matrix.django-version }}.0"
       - if: matrix.python-version != '3.12' || matrix.django-version != '5.2'
         run: uv run pytest
