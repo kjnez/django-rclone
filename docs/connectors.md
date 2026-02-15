@@ -63,7 +63,12 @@ Uses `mysqldump` for backups and `mysql` for restores.
 
 **Security:** Passwords are passed via the `MYSQL_PWD` environment variable, never as command-line arguments. This is a security improvement over django-dbbackup, which passes MySQL passwords directly on the command line.
 
-**Requirements:** `mysqldump` and `mysql` must be installed and on the system `PATH`. These are included in the `mysql-client` or `mariadb-client` packages.
+**Requirements:** `mysqldump` and `mysql` must be installed and on the system `PATH`.
+For integration testing with Django's MySQL backend, `mysqlclient` build headers are also required.
+On Debian/Ubuntu, install:
+
+- `default-mysql-client`
+- `default-libmysqlclient-dev`
 
 ### SQLite -- `SqliteConnector`
 

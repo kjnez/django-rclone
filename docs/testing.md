@@ -72,6 +72,13 @@ Tests are skipped automatically when required tools are missing.
 - PostgreSQL integration tests: `pg_dump`, `pg_isready`, and a Python PostgreSQL driver (`psycopg` or `psycopg2`)
 - MySQL integration tests: `mysqldump`, `mysqladmin`, and `mysqlclient` (`MySQLdb`, 2.2.1+)
 
+On Debian/Ubuntu, install MySQL integration prerequisites with:
+
+```bash
+sudo apt update
+sudo apt install -y default-mysql-client default-libmysqlclient-dev
+```
+
 ### Environment variables
 
 You can override integration connection settings:
