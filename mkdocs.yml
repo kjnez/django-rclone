@@ -42,4 +42,5 @@ nav:
   - Storage Providers: providers.md
   - Connectors: connectors.md
   - Signals: signals.md
+  - Scheduling: scheduling.md
   - Migrating from django-dbbackup: migration-from-dbbackup.md
