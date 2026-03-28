@@ -45,6 +45,6 @@ jobs:
         run: uv run pytest --cov --cov-branch --cov-report=xml
       - name: Upload coverage reports to Codecov
         if: matrix.python-version == '3.12' && matrix.django-version == '5.2'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
