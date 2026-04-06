@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from datetime import UTC, datetime
+from typing import cast
 from uuid import uuid4
 
 from django.conf import settings as django_settings
@@ -35,7 +36,7 @@ class Command(BaseCommand):
     def handle(self, *args: object, **options: object) -> None:
         database = str(options["database"])
         clean = bool(options["clean"])
-        verbosity = int(options["verbosity"])  # type: ignore[arg-type]
+        verbosity = int(cast(int | str, options["verbosity"]))
 
         if database not in django_settings.DATABASES:
             raise CommandError(f"Database '{database}' is not configured.")
@@ -109,7 +110,7 @@ class Command(BaseCommand):
             self._cleanup(rclone, database, backup_dir, verbosity)
 
     def _cleanup(self, rclone: Rclone, database: str, backup_dir: str, verbosity: int) -> None:
-        keep = int(get_setting("DB_CLEANUP_KEEP"))  # type: ignore[arg-type]
+        keep = get_setting("DB_CLEANUP_KEEP")
         template = str(get_setting("DB_FILENAME_TEMPLATE"))
         date_format = str(get_setting("DB_DATE_FORMAT"))
         files = rclone.lsjson(backup_dir)

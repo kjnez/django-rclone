@@ -4,12 +4,11 @@ import io
 import subprocess
 from contextlib import suppress
 from threading import Thread
-from typing import IO
 
 PipeDrain = tuple[Thread, list[bytes]] | None
 
 
-def start_pipe_drain(stream: IO[bytes] | None) -> PipeDrain:
+def start_pipe_drain(stream: object | None) -> PipeDrain:
     """Drain a pipe-like stream in the background to avoid pipe-buffer blocking.
 
     Returns ``None`` when ``stream`` is not a real IO stream (for example a test

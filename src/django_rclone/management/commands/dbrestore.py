@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 from django.conf import settings as django_settings
 from django.core.management.base import BaseCommand, CommandError, CommandParser
@@ -42,7 +43,7 @@ class Command(BaseCommand):
         database = str(options["database"])
         input_path = str(options["input_path"])
         interactive = bool(options["interactive"])
-        verbosity = int(options["verbosity"])  # type: ignore[arg-type]
+        verbosity = int(cast(int | str, options["verbosity"]))
 
         if not database:
             if len(django_settings.DATABASES) > 1:

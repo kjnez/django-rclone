@@ -81,11 +81,12 @@ class Command(BaseCommand):
 
     @staticmethod
     def _format_size(size: int) -> str:
+        display_size = float(size)
         for unit in ("B", "KB", "MB", "GB", "TB"):
-            if size < 1024:
-                return f"{size:.1f} {unit}" if unit != "B" else f"{size} {unit}"
-            size /= 1024  # type: ignore[assignment]
-        return f"{size:.1f} PB"
+            if display_size < 1024:
+                return f"{display_size:.1f} {unit}" if unit != "B" else f"{int(display_size)} {unit}"
+            display_size /= 1024
+        return f"{display_size:.1f} PB"
 
     @staticmethod
     def _parse_modtime(value: str) -> datetime:

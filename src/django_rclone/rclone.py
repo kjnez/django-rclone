@@ -25,7 +25,7 @@ class Rclone:
             raise ImproperlyConfigured("DJANGO_RCLONE['REMOTE'] must be configured.")
         self.config = config or str(get_setting("RCLONE_CONFIG") or "")
         self.binary = binary or str(get_setting("RCLONE_BINARY"))
-        self.flags = flags if flags is not None else list(get_setting("RCLONE_FLAGS"))  # type: ignore[arg-type]
+        self.flags = flags if flags is not None else list(get_setting("RCLONE_FLAGS"))
 
     def _base_cmd(self) -> list[str]:
         cmd = [self.binary]

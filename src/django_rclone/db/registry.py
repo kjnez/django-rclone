@@ -46,13 +46,13 @@ def get_connector(database: str = "default") -> BaseConnector:
     engine: str = db_settings["ENGINE"]
 
     # Check for per-database connector overrides
-    connectors: dict[str, str] = get_setting("CONNECTORS")  # type: ignore[assignment]
+    connectors = get_setting("CONNECTORS")
     if database in connectors:
         cls = _import_connector(connectors[database])
         return cls(db_settings)
 
     # Check for engine→connector mapping overrides
-    mapping: dict[str, str] = get_setting("CONNECTOR_MAPPING")  # type: ignore[assignment]
+    mapping = get_setting("CONNECTOR_MAPPING")
     merged = {**DEFAULT_CONNECTOR_MAPPING, **mapping}
 
     if engine not in merged:

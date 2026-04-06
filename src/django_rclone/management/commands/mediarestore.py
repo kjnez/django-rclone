@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from django.conf import settings as django_settings
 from django.core.management.base import BaseCommand
 
@@ -12,7 +14,7 @@ class Command(BaseCommand):
     help = "Restore media files from rclone remote using rclone sync."
 
     def handle(self, *args: object, **options: object) -> None:
-        verbosity = int(options["verbosity"])  # type: ignore[arg-type]
+        verbosity = int(cast(int | str, options["verbosity"]))
 
         media_root = django_settings.MEDIA_ROOT
         if not media_root:

@@ -33,9 +33,9 @@ class TestGetSetting:
         assert get_setting("CONNECTOR_MAPPING") == {}
 
     def test_default_mutable_values_are_copied(self):
-        flags: list[str] = get_setting("RCLONE_FLAGS")  # type: ignore[assignment]
-        connectors: dict[str, str] = get_setting("CONNECTORS")  # type: ignore[assignment]
-        mapping: dict[str, str] = get_setting("CONNECTOR_MAPPING")  # type: ignore[assignment]
+        flags = get_setting("RCLONE_FLAGS")
+        connectors = get_setting("CONNECTORS")
+        mapping = get_setting("CONNECTOR_MAPPING")
 
         assert isinstance(flags, list)
         assert isinstance(connectors, dict)
@@ -57,8 +57,8 @@ class TestGetSetting:
         }
     )
     def test_user_mutable_values_are_copied(self):
-        flags: list[str] = get_setting("RCLONE_FLAGS")  # type: ignore[assignment]
-        connectors: dict[str, str] = get_setting("CONNECTORS")  # type: ignore[assignment]
+        flags = get_setting("RCLONE_FLAGS")
+        connectors = get_setting("CONNECTORS")
 
         assert isinstance(flags, list)
         assert isinstance(connectors, dict)
